@@ -1,8 +1,13 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Reports') }}
+        </h2>
+    </x-slot>
 
-@section('content')
-    <div class="bg-white rounded shadow p-8">
-        <h1 class="text-2xl font-bold mb-2">Reports</h1>
-        <p class="text-gray-600">Custom reports and exports. Coming soon.</p>
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <livewire:reports />
+        </div>
     </div>
-@endsection
+</x-app-layout>

@@ -18,8 +18,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('/timesheets', 'timesheets')->name('timesheets');
     Route::view('/schedules',  'schedules')->name('schedules');
     Route::view('/reports',    'reports')->name('reports');
-    Route::view('/admin',      'admin')->name('admin');
+    Route::view('/admin',      'layouts.admin')->name('admin');
     Route::view('/map',        'map')->name('map');
+    Route::view('/groups', 'groups')->name('groups');
 
     // Time → Timesheets submenu
     Route::view('/timesheets/view',    'timesheets.view')->name('timesheets.view');
