@@ -5,6 +5,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TimeClockController;
 use App\Http\Controllers\ProfileController;
 
+use App\Livewire\Employees;
+use App\Livewire\Departments;
+use App\Livewire\Locations;
+
 Route::get('/', function () {
     return redirect()->route('dashboard');
 });
@@ -15,12 +19,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard',  [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/time-clock', [TimeClockController::class, 'index'])->name('timeclock.index');
 
+    // Admin Management Pages (Livewire Full-Page Routes)
+    Route::get('/admin/employees', Employees::class)->name('admin.employees');
+    Route::get('/admin/departments', Departments::class)->name('admin.departments');
+    Route::get('/admin/locations', Locations::class)->name('admin.locations');
+    Route::get('/admin', fn() => redirect()->route('admin.employees'));
+
     Route::view('/timesheets', 'timesheets')->name('timesheets');
     Route::view('/schedules',  'schedules')->name('schedules');
     Route::view('/reports',    'reports')->name('reports');
-    Route::view('/admin',      'layouts.admin')->name('admin');
     Route::view('/map',        'map')->name('map');
-    Route::view('/groups', 'groups')->name('groups');
+    Route::view('/groups',     'groups')->name('groups');
 
     // Time → Timesheets submenu
     Route::view('/timesheets/view',    'timesheets.view')->name('timesheets.view');
