@@ -10,6 +10,8 @@ use App\Livewire\Departments;
 use App\Livewire\Locations;
 use App\Livewire\TimeOff\Index as TimeOffIndex;
 use App\Livewire\TimeOff\PolicyWizard;
+use App\Livewire\Work\Jobs;
+use App\Livewire\Work\Tasks;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -46,8 +48,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Work submenu
     Route::view('/work',          'work')->name('work');
     Route::view('/work/customers', 'work.customers')->name('work.customers');
-    Route::view('/work/jobs',      'work.jobs')->name('work.jobs');
-    Route::view('/work/tasks',     'work.tasks')->name('work.tasks');
+
+    // Livewire full-page routes for Jobs and Tasks
+    Route::get('/work/jobs', Jobs::class)->name('work.jobs');
+    Route::get('/work/tasks', Tasks::class)->name('work.tasks');
+
     Route::view('/work/quotes',    'work.quotes')->name('work.quotes');
     Route::view('/work/invoices',  'work.invoices')->name('work.invoices');
     Route::view('/work/employees', 'work.employees')->name('work.employees');

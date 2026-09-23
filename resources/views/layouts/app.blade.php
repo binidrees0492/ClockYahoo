@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ config('app.name', 'ClockShark') }}</title>
+    <title>{{ config('app.name', 'AXHAN') }}</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Alpine.js is required for x-data modals -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
@@ -19,14 +21,13 @@
         .border-cs-blue { border-color: #005a9c; }
         .bg-cs-today    { background-color: #fdf6e3; }
 
-        /* Navbar dropdown */
         .nav-dropdown { position: relative; }
         .nav-dropdown > .dd-menu {
             display: none;
             position: absolute;
             top: 100%;
             left: 0;
-            min-width: 250px;
+            min-width: 200px;
             background: #ffffff;
             color: #1f2937;
             border: 1px solid #e5e7eb;
@@ -74,9 +75,13 @@
         <div class="flex justify-between h-14 items-center">
 
             <div class="flex items-center space-x-8">
-                <a href="{{ route('dashboard') }}" class="text-xl font-bold italic tracking-tighter">ClockShark</a>
+                <a href="{{ route('dashboard') }}" class="text-xl font-bold italic tracking-tighter">AXHAN</a>
 
                 <div class="hidden md:flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
+
+                    <!-- Added My Time Clock -->
+                    <a href="{{ route('dashboard') }}" class="hover:text-gray-300">My Time Clock</a>
+
                     <div class="nav-dropdown">
                         <a href="{{ route('dashboard') }}" class="flex items-center gap-1 cursor-pointer">Time <span class="text-[8px]">&#9660;</span></a>
                         <div class="dd-menu">
@@ -92,9 +97,20 @@
                     </div>
 
                     <a href="{{ route('schedules') }}">Schedules</a>
+
+                    <!-- Added Work Dropdown -->
+                    <div class="nav-dropdown">
+                        <a href="#" class="flex items-center gap-1 cursor-pointer {{ request()->routeIs('work.*') ? 'border-b-2 border-orange-400 pb-1' : '' }}">
+                            Work <span class="text-[8px]">&#9660;</span>
+                        </a>
+                        <div class="dd-menu">
+                            <a href="{{ route('work.jobs') }}" class="dd-link">Jobs</a>
+                            <a href="{{ route('work.tasks') }}" class="dd-link">Tasks</a>
+                        </div>
+                    </div>
+
                     <a href="{{ route('reports') }}">Reports</a>
 
-                    {{-- ADMIN dropdown --}}
                     <div class="nav-dropdown">
                         <a href="{{ route('admin.employees') }}" class="flex items-center gap-1 cursor-pointer {{ request()->routeIs('admin.*') || request()->routeIs('timeoff.policies*') ? 'border-b-2 border-orange-400 pb-1' : '' }}">
                             Admin <span class="text-[8px]">&#9660;</span>
@@ -110,7 +126,6 @@
                             <div class="dd-group-title">Company</div>
                             <a href="#" class="dd-link">Company Settings</a>
                             <a href="{{ route('timeoff.policies') }}" class="dd-link">Time Off Policies</a>
-                            <a href="#" class="dd-link">Integrations</a>
                         </div>
                     </div>
 
