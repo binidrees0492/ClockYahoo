@@ -258,6 +258,6 @@ class PolicyWizard extends Component
         return view('livewire.time-off.policy-wizard', [
             'employees'  => User::orderBy('name')->get(),
             'titleLabel' => $this->policyId ? 'Edit Policy' : 'Add Policy',
-        ]);
+        ])->layout('layouts.app'); // Force it to use your app.blade.php layout
     }
 }

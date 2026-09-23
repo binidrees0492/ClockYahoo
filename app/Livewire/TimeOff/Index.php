@@ -14,6 +14,12 @@ class Index extends Component
 {
     public $tab = 'requests'; // requests | policies
 
+    // Add this to catch the route parameter
+    public function mount($tab = 'requests')
+    {
+        $this->tab = $tab;
+    }
+
     // Requests list
     public $requestFilter = 'all';
     public $requestEmployeeFilter = null;
@@ -153,6 +159,6 @@ class Index extends Component
             'requests'  => $requests,
             'policies'  => $policies,
             'employees' => User::orderBy('name')->get(),
-        ]);
+        ])->layout('layouts.app'); // Force it to use your app.blade.php layout
     }
 }

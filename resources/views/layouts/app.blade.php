@@ -83,6 +83,11 @@
                             <div class="dd-group-title">Timesheets</div>
                             <a href="{{ route('timesheets.view') }}" class="dd-link">View</a>
                             <a href="{{ route('timesheets.approve') }}" class="dd-link">Approve</a>
+
+                            <div class="dd-divider"></div>
+
+                            <div class="dd-group-title">Time Off</div>
+                            <a href="{{ route('timeoff.requests') }}" class="dd-link">Time Off Requests</a>
                         </div>
                     </div>
 
@@ -91,7 +96,7 @@
 
                     {{-- ADMIN dropdown --}}
                     <div class="nav-dropdown">
-                        <a href="{{ route('admin.employees') }}" class="flex items-center gap-1 cursor-pointer {{ request()->routeIs('admin.*') ? 'border-b-2 border-orange-400 pb-1' : '' }}">
+                        <a href="{{ route('admin.employees') }}" class="flex items-center gap-1 cursor-pointer {{ request()->routeIs('admin.*') || request()->routeIs('timeoff.policies*') ? 'border-b-2 border-orange-400 pb-1' : '' }}">
                             Admin <span class="text-[8px]">&#9660;</span>
                         </a>
                         <div class="dd-menu">
@@ -104,6 +109,7 @@
 
                             <div class="dd-group-title">Company</div>
                             <a href="#" class="dd-link">Company Settings</a>
+                            <a href="{{ route('timeoff.policies') }}" class="dd-link">Time Off Policies</a>
                             <a href="#" class="dd-link">Integrations</a>
                         </div>
                     </div>

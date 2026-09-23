@@ -8,6 +8,8 @@ use App\Http\Controllers\ProfileController;
 use App\Livewire\Employees;
 use App\Livewire\Departments;
 use App\Livewire\Locations;
+use App\Livewire\TimeOff\Index as TimeOffIndex;
+use App\Livewire\TimeOff\PolicyWizard;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -35,13 +37,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('/timesheets/view',    'timesheets.view')->name('timesheets.view');
     Route::view('/timesheets/approve', 'timesheets.approve')->name('timesheets.approve');
 
-    // Time → Time Off submenu
-    Route::view('/time-off/policies',     'time-off.policies')->name('timeoff.policies');
-    Route::view('/time-off/requests',     'time-off.requests')->name('timeoff.requests');
-    Route::view('/time-off/policies/add', 'time-off.policy-wizard')->name('timeoff.policies.add');
-    Route::get('/time-off/policies/{id}/edit',
-        fn ($id) => view('time-off.policy-wizard', ['policyId' => (int) $id])
-    )->name('timeoff.policies.edit');
+    // Time → Time Off submenu (Livewire Full-Page Routes)
+    Route::get('/time-off/policies', TimeOffIndex::class)->defaults('tab', 'policies')->name('timeoff.policies');
+    Route::get('/time-off/requests', TimeOffIndex::class)->defaults('tab', 'requests')->name('timeoff.requests');
+    Route::get('/time-off/policies/add', PolicyWizard::class)->name('timeoff.policies.add');
+    Route::get('/time-off/policies/{policyId}/edit', PolicyWizard::class)->name('timeoff.policies.edit');
 
     // Work submenu
     Route::view('/work',          'work')->name('work');
