@@ -63,7 +63,7 @@ class Employees extends Component
     {
         $this->resetValidation();
         $this->reset(['employeeId', 'first_name', 'last_name', 'email', 'phone', 'password', 'display_id', 'designation_id', 'base_pay']);
-        $this->password = 'password';
+        $this->password = 'password'; // Default temporary password
         $this->modalMode = 'add';
         $this->isModalOpen = true;
     }
@@ -82,6 +82,7 @@ class Employees extends Component
         $this->designation_id = $employee->designation_id;
         $this->department_id = $employee->department_id ?? '';
         $this->status = $employee->status ?? 'Active';
+        $this->password = ''; // Leave blank during edit unless changing
 
         $this->modalMode = 'edit';
         $this->isModalOpen = true;
@@ -112,8 +113,11 @@ class Employees extends Component
             'status' => $this->status,
         ];
 
+        // If creating a new employee or typing a new password during edit, hash it securely
         if (!$this->employeeId) {
             $data['password'] = Hash::make($this->password ?: 'password');
+        } elseif (!empty($this->password)) {
+            $data['password'] = Hash::make($this->password);
         }
 
         Employee::updateOrCreate(['id' => $this->employeeId], $data);
@@ -139,6 +143,6 @@ class Employees extends Component
 
         return view('livewire.employees', [
             'employees' => $employees,
-        ])->layout('layouts.app'); // Forces full-page layout binding
+        ])->layout('layouts.app');
     }
 }

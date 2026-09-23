@@ -7,7 +7,7 @@
 
     @if(!$showForm)
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-semibold text-gray-800">Departments - ClockYahoo</h2>
+            <h2 class="text-2xl font-semibold text-gray-800">Departments - ClockVertex</h2>
             <button wire:click="create" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700">
                 Add Department
             </button>

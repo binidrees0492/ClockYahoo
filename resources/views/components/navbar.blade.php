@@ -3,7 +3,7 @@
         <div class="flex justify-between h-16">
             <div class="flex items-center">
                 <a href="{{ route('dashboard') }}" class="flex-shrink-0 mr-8">
-                    <span class="text-xl font-black italic text-[#005a9c] tracking-tight">AXHAN Digital</span>
+                    <span class="text-xl font-black italic text-[#005a9c] tracking-tight">ClockVertex Digital</span>
                 </a>
 
                 <nav class="hidden md:flex space-x-1 h-full" role="navigation">

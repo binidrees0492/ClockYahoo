@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TimeClockController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportPrintController;
 
 use App\Livewire\Employees;
 use App\Livewire\Departments;
@@ -12,6 +13,7 @@ use App\Livewire\TimeOff\Index as TimeOffIndex;
 use App\Livewire\TimeOff\PolicyWizard;
 use App\Livewire\Work\Jobs;
 use App\Livewire\Work\Tasks;
+use App\Livewire\Reports;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -31,7 +33,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::view('/timesheets', 'timesheets')->name('timesheets');
     Route::view('/schedules',  'schedules')->name('schedules');
-    Route::view('/reports',    'reports')->name('reports');
+    Route::get('/reports',     Reports::class)->name('reports');
+    Route::get('/reports/print', [ReportPrintController::class, 'generatePdf'])->name('reports.print');
+
     Route::view('/map',        'map')->name('map');
     Route::view('/groups',     'groups')->name('groups');
 
@@ -48,11 +52,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Work submenu
     Route::view('/work',          'work')->name('work');
     Route::view('/work/customers', 'work.customers')->name('work.customers');
-
-    // Livewire full-page routes for Jobs and Tasks
-    Route::get('/work/jobs', Jobs::class)->name('work.jobs');
-    Route::get('/work/tasks', Tasks::class)->name('work.tasks');
-
+    Route::get('/work/jobs',      Jobs::class)->name('work.jobs');
+    Route::get('/work/tasks',     Tasks::class)->name('work.tasks');
     Route::view('/work/quotes',    'work.quotes')->name('work.quotes');
     Route::view('/work/invoices',  'work.invoices')->name('work.invoices');
     Route::view('/work/employees', 'work.employees')->name('work.employees');

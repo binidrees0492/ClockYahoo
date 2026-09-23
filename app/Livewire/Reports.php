@@ -76,19 +76,29 @@ class Reports extends Component
     public function viewReportPortrait()
     {
         $this->validateDates();
-        // Hook this into a real PDF view or return streamed PDF response if required
-        session()->flash('message', "Portrait view generated successfully for {$this->currentTab}.");
+        $url = route('reports.print', [
+            'tab' => $this->currentTab,
+            'orientation' => 'portrait',
+            'start_date' => $this->startDate,
+            'end_date' => $this->endDate,
+        ]);
+
+        $this->js("window.open('{$url}', '_blank');");
     }
 
     public function viewReportLandscape()
     {
         $this->validateDates();
-        session()->flash('message', "Landscape view generated successfully for {$this->currentTab}.");
+        $url = route('reports.print', [
+            'tab' => $this->currentTab,
+            'orientation' => 'landscape',
+            'start_date' => $this->startDate,
+            'end_date' => $this->endDate,
+        ]);
+
+        $this->js("window.open('{$url}', '_blank');");
     }
 
-    /**
-     * Real Working CSV Export Function
-     */
     public function downloadCSV()
     {
         $this->validateDates();
@@ -103,11 +113,9 @@ class Reports extends Component
             "Expires" => "0"
         ];
 
-        // Build query based on active tab and filters
         $callback = function() {
             $file = fopen('php://output', 'w');
 
-            // Write CSV Headers depending on report type
             if (in_array($this->currentTab, ['QuickSummary', 'JobDetail', 'EmployeeDetail', 'CsvExport', 'TimeSheet'])) {
                 fputcsv($file, ['Employee Name', 'Job / Assignment', 'Task', 'Clock In', 'Clock Out', 'Net Hours', 'Status', 'Notes']);
 
@@ -149,7 +157,6 @@ class Reports extends Component
                     }
                 });
             } else {
-                // Fallback basic export for other tabs
                 fputcsv($file, ['Report Type', 'Start Date', 'End Date', 'Generated At']);
                 fputcsv($file, [$this->currentTab, $this->startDate, $this->endDate, now()->toDateTimeString()]);
             }

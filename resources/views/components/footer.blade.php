@@ -1,7 +1,7 @@
 <footer class="bg-[#001726] text-white py-4 mt-auto">
     <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
         <div class="text-xs text-gray-400">
-            &copy; {{ date('Y') }} AXHAN Digital Fusion
+            &copy; {{ date('Y') }} ClockVertex Digital Fusion
         </div>
         <div class="flex space-x-4">
             <button class="bg-[#f26522] hover:bg-orange-600 text-white text-sm font-bold py-1.5 px-4 rounded-full">
