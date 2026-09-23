@@ -5,6 +5,7 @@ namespace App\Livewire;
 use Livewire\Component;
 use App\Models\TimeLog;
 use App\Models\Assignment;
+use App\Models\User; // Added User model
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
@@ -14,6 +15,10 @@ class ApproveTimesheets extends Component
     public $fromDate = null;
     public $toDate = null;
     public $assignmentFilter = null;
+
+    // Added missing properties from blade
+    public $employeeFilter = null;
+    public $search = '';
 
     public $selected = [];            // selected log IDs for bulk
     public $selectAll = false;
@@ -34,6 +39,17 @@ class ApproveTimesheets extends Component
         } else {
             $this->selected = [];
         }
+    }
+
+    // Added missing method called by the "Reset filters" button
+    public function clearFilters()
+    {
+        $this->filter = 'all';
+        $this->fromDate = null;
+        $this->toDate = null;
+        $this->assignmentFilter = null;
+        $this->employeeFilter = null;
+        $this->search = '';
     }
 
     public function approveSelected()
@@ -121,6 +137,21 @@ class ApproveTimesheets extends Component
             $q->where('assignment_id', $this->assignmentFilter);
         }
 
+        // Added employee filter logic
+        if ($this->employeeFilter) {
+            $q->where('employee_id', $this->employeeFilter);
+        }
+
+        // Added search logic for Job, Task, or Employee
+        if (trim($this->search) !== '') {
+            $term = '%' . trim($this->search) . '%';
+            $q->where(function ($w) use ($term) {
+                $w->whereHas('employee', fn ($e) => $e->where('name', 'like', $term))
+                    ->orWhereHas('assignment', fn ($a) => $a->where('name', 'like', $term))
+                    ->orWhereHas('task', fn ($t) => $t->where('name', 'like', $term));
+            });
+        }
+
         return $q->orderByDesc('clock_in');
     }
 
@@ -139,6 +170,7 @@ class ApproveTimesheets extends Component
         return view('livewire.approve-timesheets', [
             'logs'        => $logs,
             'assignments' => Assignment::orderBy('name')->get(),
+            'employees'   => User::orderBy('name')->get(), // Added employees collection
         ]);
     }
 }
