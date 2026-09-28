@@ -26,29 +26,44 @@ class TimeOffPolicy extends Model
     ];
 
     protected $casts = [
+        'policy_type'         => 'integer',
+        'accrual_method'      => 'integer',
         'is_time_off_limit'   => 'boolean',
+        'accrual_hours'       => 'decimal:2',
         'is_waiting_period'   => 'boolean',
+        'waiting_period_days' => 'integer',
         'is_carryover_limit'  => 'boolean',
+        'max_carryover_hours' => 'integer',
+        'max_balance_hours'   => 'integer',
         'active'              => 'boolean',
     ];
 
-    public function employees()
+    public function policyEmployees()
     {
         return $this->hasMany(TimeOffPolicyEmployee::class, 'policy_id');
     }
 
-    public function requests()
+    public function employees()
     {
-        return $this->hasMany(TimeOffRequest::class, 'policy_id');
+        return $this->belongsToMany(User::class, 'time_off_policy_employees', 'policy_id', 'employee_id')
+            ->withPivot(['hire_date', 'hours_remaining'])
+            ->withTimestamps();
     }
 
+    // Method version: $policy->policyTypeLabel()
     public function policyTypeLabel(): string
     {
-        return match ((int) $this->policy_type) {
+        return match ($this->policy_type) {
             0 => 'PTO',
             1 => 'Sick',
             2 => 'Unpaid',
-            default => 'Unknown',
+            default => 'Other',
         };
+    }
+
+    // Attribute accessor version: $policy->policy_type_name
+    public function getPolicyTypeNameAttribute(): string
+    {
+        return $this->policyTypeLabel();
     }
 }

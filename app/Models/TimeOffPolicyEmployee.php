@@ -19,7 +19,8 @@ class TimeOffPolicyEmployee extends Model
     ];
 
     protected $casts = [
-        'hire_date' => 'date',
+        'hire_date'       => 'date',
+        'hours_remaining' => 'decimal:2',
     ];
 
     public function policy()
