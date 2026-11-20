@@ -1,23 +1,30 @@
 <div class="container mx-auto px-4 py-6">
     @if (session()->has('message'))
-        <div class="mb-4 px-4 py-3 bg-green-100 text-green-800 rounded shadow-sm border border-green-200">
-            {{ session('message') }}
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3500)" x-transition class="mb-4 px-4 py-3 bg-green-100 text-green-800 rounded shadow-sm border border-green-200 flex items-center justify-between">
+            <span>{{ session('message') }}</span>
+            <button type="button" @click="show = false" class="text-green-700 hover:text-green-900 font-bold ml-3 leading-none text-base">&times;</button>
         </div>
     @endif
 
     @if(!$showForm)
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-semibold text-gray-800">Departments - ClockVertex</h2>
+            <h2 class="text-2xl font-semibold text-gray-800">Departments - ClockVerse</h2>
             <button wire:click="create" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700">
                 Add Department
             </button>
         </div>
 
-        <div class="flex items-center mb-4 bg-white p-4 rounded shadow-sm border border-gray-100">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-4 rounded shadow-sm border border-gray-100">
             <div class="flex items-center space-x-2 w-full max-w-md">
                 <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search departments..." class="form-input w-full border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500" />
                 <button wire:click="clearFilters" class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200">Clear</button>
             </div>
+            @if(auth()->user()?->isSuperAdmin())
+                <label class="inline-flex items-center gap-1.5 text-xs text-gray-700 font-semibold cursor-pointer select-none bg-gray-50 border border-gray-200 px-3 py-2 rounded">
+                    <input type="checkbox" wire:model.live="includeDeleted" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                    <span>🗑️ Include Deleted Records</span>
+                </label>
+            @endif
         </div>
 
         <div class="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
@@ -40,7 +47,18 @@
                                     </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button wire:click="edit({{ $department->id }})" class="text-indigo-600 hover:text-indigo-900">Edit</button>
+                                @if(strtolower($department->status) === 'active')
+                                    <button wire:click="edit({{ $department->id }})" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
+                                    <button wire:click="delete({{ $department->id }})" wire:confirm="Are you sure you want to delete this department?" class="text-red-600 hover:text-red-900">Delete</button>
+                                @else
+                                    <span class="text-xs text-gray-400 mr-2">Inactive</span>
+                                    @if(auth()->user()?->isSuperAdmin())
+                                        <button wire:click="restoreDepartment({{ $department->id }})" class="text-emerald-600 hover:text-emerald-800 font-semibold text-xs mr-3">Restore</button>
+                                    @endif
+                                    @if(auth()->user()?->canHardDelete())
+                                        <button wire:click="permanentlyDeleteDepartment({{ $department->id }})" wire:confirm="Are you sure you want to permanently delete this department and unlink its child records?" class="text-red-700 hover:text-red-900 font-semibold text-xs">Delete Permanently</button>
+                                    @endif
+                                @endif
                             </td>
                         </tr>
                     @empty

@@ -43,6 +43,10 @@ class PolicyWizard extends Component
 
     public function mount($policyId = null)
     {
+        if (!auth()->user()->canAccessAdmin()) {
+            abort(403, 'Unauthorized access to Time Off Policy Management.');
+        }
+
         if ($policyId) {
             $p = TimeOffPolicy::find($policyId);
             if ($p) {
@@ -89,6 +93,7 @@ class PolicyWizard extends Component
 
     public function goToAdditionalSettings()
     {
+        $this->policyType = (int) $this->policyType;
         $this->validate([
             'policyName' => 'required|string|max:100',
             'policyType' => 'required|integer|in:0,1,2',
@@ -99,7 +104,7 @@ class PolicyWizard extends Component
                 $this->addError('policyIsLimit', 'You must make a selection.');
                 return;
             }
-            if ($this->policyIsLimit == 1 && empty($this->policyAccrualHours)) {
+            if ($this->policyIsLimit == 1 && (empty($this->policyAccrualHours) && $this->policyAccrualHours !== '0' && $this->policyAccrualHours !== 0)) {
                 $this->addError('policyAccrualHours', 'Please enter accrual hours.');
                 return;
             }
@@ -107,6 +112,7 @@ class PolicyWizard extends Component
             // Unpaid: no accrual, no limit, skip Additional Settings
             $this->policyIsLimit     = 0;
             $this->policyIsCarryover = 0;
+            $this->policyAccrualHours = null;
             $this->savePolicy();
             $this->step = 'EmployeeSelection';
             return;
@@ -121,10 +127,25 @@ class PolicyWizard extends Component
         $this->step = 'PolicyDetails';
     }
 
+    public function saveAndGoToEmployeeSelection()
+    {
+        return $this->goToAdditionalSettings();
+    }
+
+    public function goBackFromEmployeeSelection()
+    {
+        if ((int)$this->policyType === 2) {
+            $this->step = 'PolicyDetails';
+        } else {
+            $this->step = 'AdditionalSettings';
+        }
+    }
+
     // ============ STEP 2 ============
 
     public function goToEmployeeSelection()
     {
+        $this->policyType = (int) $this->policyType;
         if ($this->policyType !== 2) {
             if ($this->policyIsWaiting === null) {
                 $this->addError('policyIsWaiting', 'You must make a selection.');
@@ -220,6 +241,73 @@ class PolicyWizard extends Component
         }
 
         session()->flash('success', $this->policyId ? 'Policy saved.' : 'Policy created.');
+        return redirect()->route('timeoff.policies');
+    }
+
+    public $showDeleteModal = false;
+
+    public function goToStep($targetStep)
+    {
+        // Allow step jumping if editing existing policy or moving backwards
+        $validSteps = ['PolicyDetails', 'AdditionalSettings', 'EmployeeSelection', 'EmployeeDetails'];
+        if (!in_array($targetStep, $validSteps)) return;
+
+        if ($this->policyId) {
+            $this->savePolicy();
+            $this->step = $targetStep;
+        }
+    }
+
+    public function quickSave()
+    {
+        $this->validate([
+            'policyName' => 'required|string|max:100',
+            'policyType' => 'required|integer|in:0,1,2',
+        ]);
+
+        $this->savePolicy();
+        session()->flash('success', 'Policy updated successfully.');
+        return redirect()->route('timeoff.policies');
+    }
+
+    public function confirmDelete()
+    {
+        $this->showDeleteModal = true;
+    }
+
+    public function cancelDelete()
+    {
+        $this->showDeleteModal = false;
+    }
+
+    public function deletePolicy()
+    {
+        if (!$this->policyId) {
+            return;
+        }
+
+        if (!auth()->user()->canAccessAdmin()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $policy = TimeOffPolicy::find($this->policyId);
+        if (!$policy) {
+            return redirect()->route('timeoff.policies');
+        }
+
+        $hasEmployees = TimeOffPolicyEmployee::where('policy_id', $this->policyId)->exists();
+        $hasRequests  = \App\Models\TimeOffRequest::where('policy_id', $this->policyId)->exists();
+
+        if ($hasEmployees || $hasRequests) {
+            $policy->update(['active' => false]);
+            session()->flash('message', "Policy '{$policy->name}' has enrolled employees or requests and cannot be deleted. Marked as inactive instead to preserve data integrity.");
+            return redirect()->route('timeoff.policies');
+        }
+
+        // Delete the policy if no child records exist
+        $policy->delete();
+
+        session()->flash('success', 'Policy deleted successfully.');
         return redirect()->route('timeoff.policies');
     }
 

@@ -9,8 +9,8 @@ class Department extends Model
     protected $table = 'tbl_departments';
     protected $guarded = [];
 
-    public function employees()
+    public function users()
     {
-        return $this->hasMany(Employee::class, 'department_id');
+        return $this->hasMany(User::class, 'department_id');
     }
 }

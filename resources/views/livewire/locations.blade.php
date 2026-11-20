@@ -1,8 +1,9 @@
 <div class="container mx-auto px-4 py-6" style="max-width: 1200px;">
 
     @if (session()->has('message'))
-        <div class="mb-4 px-4 py-3 bg-green-100 text-green-800 rounded shadow-sm border border-green-200">
-            {{ session('message') }}
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3500)" x-transition class="mb-4 px-4 py-3 bg-green-100 text-green-800 rounded shadow-sm border border-green-200 flex items-center justify-between">
+            <span>{{ session('message') }}</span>
+            <button type="button" @click="show = false" class="text-green-700 hover:text-green-900 font-bold ml-3 leading-none text-base">&times;</button>
         </div>
     @endif
 
@@ -14,11 +15,17 @@
             </button>
         </div>
 
-        <div class="flex items-center mb-4 bg-white p-4 rounded shadow-sm border border-gray-200">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-4 rounded shadow-sm border border-gray-200">
             <div class="flex items-center space-x-2 w-full max-w-md">
                 <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search locations..." class="form-input w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-sky-700 focus:border-sky-700" />
                 <button wire:click="clearFilters" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50">Clear</button>
             </div>
+            @if(auth()->user()?->isSuperAdmin())
+                <label class="inline-flex items-center gap-1.5 text-xs text-gray-700 font-semibold cursor-pointer select-none bg-gray-50 border border-gray-300 px-3 py-2 rounded">
+                    <input type="checkbox" wire:model.live="includeDeleted" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                    <span>🗑️ Include Deleted Records</span>
+                </label>
+            @endif
         </div>
 
         <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
@@ -40,8 +47,19 @@
                                 </span>
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <button wire:click="edit({{ $location->id }})" class="text-sky-700 hover:text-sky-900 font-medium text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded transition">Edit</button>
-                        </td>
+                            @if(strtolower($location->status) === 'active')
+                                <button wire:click="edit({{ $location->id }})" class="text-sky-700 hover:text-sky-900 font-medium text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded transition mr-2">Edit</button>
+                                <button wire:click="delete({{ $location->id }})" wire:confirm="Are you sure you want to delete this location?" class="text-red-600 hover:text-red-900 font-medium text-xs bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded transition">Delete</button>
+                            @else
+                                <span class="text-xs text-gray-400 mr-2">Inactive</span>
+                                    @if(auth()->user()?->isSuperAdmin())
+                                        <button wire:click="restoreLocation({{ $location->id }})" class="text-emerald-700 hover:text-emerald-900 font-semibold text-xs bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded transition mr-2">Restore</button>
+                                    @endif
+                                    @if(auth()->user()?->canHardDelete())
+                                        <button wire:click="permanentlyDeleteLocation({{ $location->id }})" wire:confirm="Are you sure you want to permanently delete this location and unlink its child records?" class="text-red-700 hover:text-red-900 font-semibold text-xs bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded transition">Delete Permanently</button>
+                                    @endif
+                                @endif
+                            </td>
                     </tr>
                 @empty
                     <tr>

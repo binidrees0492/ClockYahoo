@@ -31,10 +31,12 @@ class RequestManager extends Component
     public $policy_id = '';
     public $is_full_day = true;
     public $default_daily_hours = 8.00;
+    public $submission_status = 'pending';
     public $start_date = '';
     public $end_date = '';
     public $reason = '';
     public $days_breakdown = [];
+    public $breakdown_week_page = 0;
 
     // Computed Hours
     public $available_hours = 0.00;
@@ -57,8 +59,11 @@ class RequestManager extends Component
     public $employeeLeaveHistory = [];
     public $employeeEntitlements = [];
 
-    // In-Drawer Live Day Breakdown Editing
+    // In-Drawer Live Date Range & Day Breakdown Editing
+    public $detail_start_date = '';
+    public $detail_end_date = '';
     public $detail_days_breakdown = [];
+    public $detail_breakdown_week_page = 0;
     public $is_detail_breakdown_dirty = false;
 
     // Direct HR Balance Adjustment
@@ -186,6 +191,7 @@ class RequestManager extends Component
     public function regenerateDaysBreakdown()
     {
         $this->days_breakdown = [];
+        $this->breakdown_week_page = 0;
 
         if ($this->start_date && $this->end_date) {
             $start = Carbon::parse($this->start_date);
@@ -242,6 +248,99 @@ class RequestManager extends Component
         $this->is_over_balance = $this->projected_balance < 0;
     }
 
+    public function setBreakdownWeekPage(int $page): void
+    {
+        $total = count($this->weeklyBreakdown);
+        $this->breakdown_week_page = max(0, min($page, max(0, $total - 1)));
+    }
+
+    public function nextBreakdownWeek(): void
+    {
+        $this->setBreakdownWeekPage($this->breakdown_week_page + 1);
+    }
+
+    public function prevBreakdownWeek(): void
+    {
+        $this->setBreakdownWeekPage($this->breakdown_week_page - 1);
+    }
+
+    public function setDetailBreakdownWeekPage(int $page): void
+    {
+        $total = count($this->detailWeeklyBreakdown);
+        $this->detail_breakdown_week_page = max(0, min($page, max(0, $total - 1)));
+    }
+
+    public function nextDetailBreakdownWeek(): void
+    {
+        $this->setDetailBreakdownWeekPage($this->detail_breakdown_week_page + 1);
+    }
+
+    public function prevDetailBreakdownWeek(): void
+    {
+        $this->setDetailBreakdownWeekPage($this->detail_breakdown_week_page - 1);
+    }
+
+    public function getWeeklyBreakdownProperty(): array
+    {
+        return $this->groupBreakdownByWeek($this->days_breakdown);
+    }
+
+    public function getDetailWeeklyBreakdownProperty(): array
+    {
+        return $this->groupBreakdownByWeek($this->detail_days_breakdown);
+    }
+
+    protected function groupBreakdownByWeek(array $breakdown): array
+    {
+        if (empty($breakdown)) {
+            return [];
+        }
+
+        $weekStartDay = \App\Models\CompanySetting::getWeekStartDay();
+        $weeks = [];
+
+        foreach ($breakdown as $index => $day) {
+            $dt = Carbon::parse($day['date']);
+            // Calculate distance to configured week start day (0=Sun .. 6=Sat)
+            $diff = ($dt->dayOfWeek - $weekStartDay + 7) % 7;
+            $weekStart = $dt->copy()->subDays($diff)->startOfDay();
+            $weekEnd   = $weekStart->copy()->addDays(6)->endOfDay();
+            $weekKey   = $weekStart->format('Y-m-d');
+
+            if (!isset($weeks[$weekKey])) {
+                $weeks[$weekKey] = [
+                    'start_date'   => $weekStart->format('Y-m-d'),
+                    'end_date'     => $weekEnd->format('Y-m-d'),
+                    'label'        => $weekStart->format('M d') . ' – ' . $weekEnd->format('M d, Y'),
+                    'short_label'  => $weekStart->format('n/j') . ' – ' . $weekEnd->format('n/j'),
+                    'days'         => [],
+                    'total_hours'  => 0.0,
+                    'paid_hours'   => 0.0,
+                    'unpaid_hours' => 0.0,
+                ];
+            }
+
+            $dayWithIndex = $day;
+            $dayWithIndex['original_index'] = $index;
+            $weeks[$weekKey]['days'][] = $dayWithIndex;
+
+            $hrs = (float)($day['hours'] ?? 0);
+            $weeks[$weekKey]['total_hours'] += $hrs;
+            if (!empty($day['is_unpaid'])) {
+                $weeks[$weekKey]['unpaid_hours'] += $hrs;
+            } else {
+                $weeks[$weekKey]['paid_hours'] += $hrs;
+            }
+        }
+
+        return array_values($weeks);
+    }
+
+    public function generateDaysBreakdown()
+    {
+        $this->regenerateDaysBreakdown();
+    }
+
     public function openRequestModal()
     {
         $this->resetValidation();
@@ -250,10 +349,24 @@ class RequestManager extends Component
         $this->end_date = now()->addDay()->format('Y-m-d');
         $this->is_full_day = true;
         $this->default_daily_hours = 8.00;
+        $this->submission_status = (Auth::user()->isAdmin() || Auth::user()->isHrManager()) ? 'approved' : 'pending';
         $this->reason = '';
+        $this->breakdown_week_page = 0;
 
         $this->syncEmployeeContext();
         $this->isModalOpen = true;
+    }
+
+    public function setDayTypeSelection($isFull)
+    {
+        $this->is_full_day = (bool)$isFull;
+        if (!$this->is_full_day && (float)$this->default_daily_hours == 8.00) {
+            $this->default_daily_hours = 4.00;
+        } elseif ($this->is_full_day) {
+            $this->default_daily_hours = 8.00;
+        }
+        $this->regenerateDaysBreakdown();
+        $this->recalculateTotals();
     }
 
     public function closeRequestModal()
@@ -273,9 +386,30 @@ class RequestManager extends Component
             'days_breakdown.*.hours' => 'required|numeric|min:0|max:24',
         ]);
 
+        $currentUser = Auth::user();
+        if ($this->selected_employee_id != $currentUser->id) {
+            if (!$currentUser->isAdmin() && !$currentUser->isHrManager()) {
+                if (!$currentUser->isManager() || !$currentUser->canManagerDo('manage_time_off') || !$currentUser->canManageEmployee($this->selected_employee_id)) {
+                    session()->flash('error', 'You are not authorized to submit time off requests for this employee.');
+                    return;
+                }
+            }
+        }
+
+        $policy = TimeOffPolicy::find($this->policy_id);
+        $isUnpaidPolicy = $policy && (int)$policy->policy_type === 2;
+
         $isEnrolled = TimeOffPolicyEmployee::where('employee_id', $this->selected_employee_id)
             ->where('policy_id', $this->policy_id)
             ->exists();
+
+        if (!$isEnrolled && $isUnpaidPolicy) {
+            TimeOffPolicyEmployee::firstOrCreate(
+                ['employee_id' => $this->selected_employee_id, 'policy_id' => $this->policy_id],
+                ['hours_remaining' => 0]
+            );
+            $isEnrolled = true;
+        }
 
         if (!$isEnrolled) {
             $this->addError('policy_id', 'The employee is not assigned to this time off policy.');
@@ -283,6 +417,9 @@ class RequestManager extends Component
         }
 
         $this->recalculateTotals();
+
+        $canApproveDirectly = $currentUser->isAdmin() || $currentUser->isHrManager();
+        $initialStatus = ($canApproveDirectly && $this->submission_status === 'approved') ? 'approved' : 'pending';
 
         $request = TimeOffRequest::create([
             'employee_id'     => $this->selected_employee_id,
@@ -297,17 +434,32 @@ class RequestManager extends Component
             'paid_hours'      => $this->paid_hours,
             'unpaid_hours'    => $this->unpaid_hours,
             'reason'          => $this->reason,
-            'status'          => 'pending',
+            'status'          => $initialStatus,
+            'decided_by'      => $initialStatus === 'approved' ? $currentUser->id : null,
+            'decided_at'      => $initialStatus === 'approved' ? now() : null,
+            'decision_notes'  => $initialStatus === 'approved' ? 'Directly created as approved by HR.' : null,
         ]);
+
+        if ($initialStatus === 'approved') {
+            $balance = TimeOffPolicyEmployee::where('employee_id', $this->selected_employee_id)
+                ->where('policy_id', $this->policy_id)
+                ->first();
+            if ($balance) {
+                $deduction = $this->paid_hours > 0 ? (float)$this->paid_hours : (float)$this->total_requested_hours;
+                $balance->hours_remaining = (float)$balance->hours_remaining - $deduction;
+                $balance->save();
+            }
+        }
 
         $creator = Auth::user()->name;
         $flagNote = $this->is_over_balance ? ' [WARNING: Over-Credit Requested]' : '';
         $paidNote = $this->unpaid_hours > 0 ? " ({$this->paid_hours}h paid, {$this->unpaid_hours}h unpaid)" : '';
+        $statusNote = $initialStatus === 'approved' ? ' (Directly Approved)' : " Routed to {$this->routed_manager_name}.";
         TimeOffRequestThread::create([
             'time_off_request_id' => $request->id,
             'user_id'             => Auth::id(),
             'type'                => 'system_event',
-            'message'             => "Request filed by {$creator} for {$this->total_requested_hours} hrs{$paidNote}. Routed to {$this->routed_manager_name}.{$flagNote}",
+            'message'             => "Request filed by {$creator} for {$this->total_requested_hours} hrs{$paidNote}.{$statusNote}{$flagNote}",
         ]);
 
         if (!empty($this->reason)) {
@@ -317,6 +469,25 @@ class RequestManager extends Component
                 'type'                => 'message',
                 'message'             => $this->reason,
             ]);
+        }
+
+        try {
+            $notifiables = collect();
+            if ($this->routed_manager_id) {
+                $mgr = User::find($this->routed_manager_id);
+                if ($mgr) $notifiables->push($mgr);
+            }
+            if ($notifiables->isEmpty()) {
+                $notifiables = User::whereIn('role', ['Administrator', 'HR Manager'])->get();
+            }
+
+            foreach ($notifiables as $recipient) {
+                if ($recipient->id !== Auth::id()) {
+                    $recipient->notify(new \App\Notifications\TimeOffRequestSubmitted($request));
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to send time off notification: " . $e->getMessage());
         }
 
         session()->flash('message', 'Time off request submitted.');
@@ -342,16 +513,43 @@ class RequestManager extends Component
         session()->flash('message', 'Request successfully withdrawn.');
     }
 
+    public function viewRequestDetails($id)
+    {
+        $this->openViewModal($id);
+    }
+
     public function openViewModal($id)
     {
         $this->selectedRequest = TimeOffRequest::with(['employee.manager', 'policy', 'approver', 'decidedByUser', 'threads.user'])
             ->findOrFail($id);
 
+        $user = Auth::user();
+        if (!$user->isAdmin() && !$user->isHrManager()) {
+            if ($user->isManager()) {
+                if (!$user->canManagerDo('manage_time_off') || (!$user->canManageEmployee($this->selectedRequest->employee_id) && $this->selectedRequest->approver_id !== $user->id && $this->selectedRequest->employee_id !== $user->id)) {
+                    abort(403, 'Unauthorized.');
+                }
+            } else {
+                if ($this->selectedRequest->employee_id !== $user->id) {
+                    abort(403, 'Unauthorized.');
+                }
+            }
+        }
+
+        $this->detail_start_date = $this->selectedRequest->start_at->format('Y-m-d');
+        $this->detail_end_date = $this->selectedRequest->end_at->format('Y-m-d');
         $this->detail_days_breakdown = $this->selectedRequest->daily_breakdown ?? [];
+        $this->detail_breakdown_week_page = 0;
         $this->is_detail_breakdown_dirty = false;
 
         $this->reloadEntitlementsAndHistory();
         $this->isDetailModalOpen = true;
+    }
+
+    public function canEditDateRanges(): bool
+    {
+        $user = Auth::user();
+        return $user->isAdmin() || $user->isHrManager();
     }
 
     public function canEditDetailBreakdown(): bool
@@ -361,12 +559,72 @@ class RequestManager extends Component
             return true;
         }
 
-        // Employee can edit if request is pending
+        // Employee can edit their own request only if it is pending
         if ($user->id === $this->selectedRequest->employee_id && $this->selectedRequest->status === 'pending') {
             return true;
         }
 
+        // Managers cannot edit hours/days
         return false;
+    }
+
+    public function updatedDetailStartDate()
+    {
+        if (!$this->canEditDateRanges()) return;
+
+        if (strtotime($this->detail_end_date) < strtotime($this->detail_start_date)) {
+            $this->detail_end_date = $this->detail_start_date;
+        }
+        $this->regenerateDetailDaysBreakdown();
+        $this->is_detail_breakdown_dirty = true;
+    }
+
+    public function updatedDetailEndDate()
+    {
+        if (!$this->canEditDateRanges()) return;
+
+        if (strtotime($this->detail_end_date) < strtotime($this->detail_start_date)) {
+            $this->detail_start_date = $this->detail_end_date;
+        }
+        $this->regenerateDetailDaysBreakdown();
+        $this->is_detail_breakdown_dirty = true;
+    }
+
+    public function regenerateDetailDaysBreakdown()
+    {
+        $this->detail_breakdown_week_page = 0;
+        $existingMap = collect($this->detail_days_breakdown)->keyBy('date');
+        $newBreakdown = [];
+
+        if ($this->detail_start_date && $this->detail_end_date) {
+            $start = Carbon::parse($this->detail_start_date);
+            $end = Carbon::parse($this->detail_end_date);
+
+            $current = $start->copy();
+            while ($current->lte($end)) {
+                $dStr = $current->format('Y-m-d');
+                $isWeekend = $current->isWeekend();
+
+                if ($existingMap->has($dStr)) {
+                    $newBreakdown[] = $existingMap->get($dStr);
+                } else {
+                    $type = $isWeekend ? 'off' : 'full';
+                    $hours = $isWeekend ? 0.00 : 8.00;
+                    $newBreakdown[] = [
+                        'date'       => $dStr,
+                        'day_name'   => $current->format('l'),
+                        'formatted'  => $current->format('M d, Y'),
+                        'is_weekend' => $isWeekend,
+                        'type'       => $type,
+                        'is_unpaid'  => false,
+                        'hours'      => $hours,
+                    ];
+                }
+                $current->addDay();
+            }
+        }
+
+        $this->detail_days_breakdown = $newBreakdown;
     }
 
     public function setDetailDayType($index, $type)
@@ -395,13 +653,14 @@ class RequestManager extends Component
 
     public function updatedDetailDaysBreakdown()
     {
+        if (!$this->canEditDetailBreakdown()) return;
         $this->is_detail_breakdown_dirty = true;
     }
 
     public function saveDetailBreakdownChanges()
     {
         if (!$this->canEditDetailBreakdown()) {
-            session()->flash('error', 'Unauthorized to modify daily hours.');
+            session()->flash('error', 'Unauthorized to modify dates or hours.');
             return;
         }
 
@@ -419,25 +678,40 @@ class RequestManager extends Component
             }
         }
 
+        $oldStart = $this->selectedRequest->start_at->format('M d, Y');
+        $oldEnd = $this->selectedRequest->end_at->format('M d, Y');
         $oldTotal = (float)$this->selectedRequest->hours;
-        $this->selectedRequest->update([
+
+        $updateData = [
             'daily_breakdown' => $this->detail_days_breakdown,
             'hours'           => $totalSum,
             'paid_hours'      => $paidSum,
             'unpaid_hours'    => $unpaidSum,
-        ]);
+        ];
+
+        if ($this->canEditDateRanges()) {
+            $updateData['start_at'] = Carbon::parse($this->detail_start_date)->startOfDay();
+            $updateData['end_at']   = Carbon::parse($this->detail_end_date)->endOfDay();
+        }
+
+        $this->selectedRequest->update($updateData);
 
         $user = Auth::user();
+        $dateChangeNote = ($this->canEditDateRanges() && ($oldStart !== Carbon::parse($this->detail_start_date)->format('M d, Y') || $oldEnd !== Carbon::parse($this->detail_end_date)->format('M d, Y')))
+            ? " Dates changed from [{$oldStart} - {$oldEnd}] to [{$this->detail_start_date} - {$this->detail_end_date}]."
+            : '';
+
         TimeOffRequestThread::create([
             'time_off_request_id' => $this->selectedRequest->id,
             'user_id'             => $user->id,
             'type'                => 'status_change',
-            'message'             => "Daily hours breakdown updated by {$user->name} ({$user->role}). Total adjusted from {$oldTotal}h to {$totalSum}h ({$paidSum}h paid, {$unpaidSum}h unpaid).",
+            'message'             => "Request modified by {$user->name} ({$user->role}). Total adjusted from {$oldTotal}h to {$totalSum}h ({$paidSum}h paid, {$unpaidSum}h unpaid).{$dateChangeNote}",
         ]);
 
         $this->is_detail_breakdown_dirty = false;
+        $this->selectedRequest->refresh();
         $this->selectedRequest->load('threads.user');
-        session()->flash('message', 'Daily hours breakdown updated successfully.');
+        session()->flash('message', 'Request schedule and date range updated successfully.');
     }
 
     public function reloadEntitlementsAndHistory()
@@ -550,12 +824,34 @@ class RequestManager extends Component
             'newThreadComment' => 'required|string|max:1000',
         ]);
 
+        $commentText = trim($this->newThreadComment);
+
         TimeOffRequestThread::create([
             'time_off_request_id' => $this->selectedRequest->id,
             'user_id'             => Auth::id(),
             'type'                => 'message',
-            'message'             => trim($this->newThreadComment),
+            'message'             => $commentText,
         ]);
+
+        try {
+            $sender = Auth::user();
+            $targetUser = null;
+            if ($this->selectedRequest->employee_id === $sender->id) {
+                $targetUser = $this->selectedRequest->approver ?: User::where('role', 'Super Admin')->first();
+            } else {
+                $targetUser = $this->selectedRequest->employee;
+            }
+
+            if ($targetUser && $targetUser->id !== $sender->id) {
+                $targetUser->notify(new \App\Notifications\GenericNotification(
+                    "New comment on Time Off Request from {$sender->name}: " . \Illuminate\Support\Str::limit($commentText, 80),
+                    url('/time-off/requests'),
+                    "New Time Off Comment"
+                ));
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to send thread comment notification: " . $e->getMessage());
+        }
 
         $this->newThreadComment = '';
         $this->selectedRequest->load('threads.user');
@@ -580,7 +876,7 @@ class RequestManager extends Component
         $user = Auth::user();
 
         if (!$user->isAdmin() && !$user->isHrManager()) {
-            if ($req->approver_id !== $user->id && !$user->canManageEmployee($req->employee_id)) {
+            if (!$user->isManager() || !$user->canManagerDo('manage_time_off') || (!$user->canManageEmployee($req->employee_id) && $req->approver_id !== $user->id)) {
                 session()->flash('error', 'Unauthorized to decide on this request.');
                 $this->closeDecisionModal();
                 return;
@@ -642,6 +938,15 @@ class RequestManager extends Component
             session()->flash('message', 'Request marked as denied.');
         }
 
+        try {
+            $employee = $req->employee;
+            if ($employee && $employee->id !== $user->id) {
+                $employee->notify(new \App\Notifications\TimeOffRequestDecided($req, $this->decisionAction));
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to send time off decision notification: " . $e->getMessage());
+        }
+
         if ($this->selectedRequest && $this->selectedRequest->id === $req->id) {
             $this->selectedRequest->load('threads.user');
         }
@@ -658,9 +963,11 @@ class RequestManager extends Component
             ->when($this->employee_filter, fn($q) => $q->where('employee_id', $this->employee_filter));
 
         if (!$user->isAdmin() && !$user->isHrManager()) {
-            if ($user->isManager()) {
-                $query->where(function($q) use ($user) {
-                    $q->where('approver_id', $user->id)
+            if ($user->isManager() && $user->canManagerDo('manage_time_off')) {
+                $scopedIds = $user->getAccessibleEmployeeIds();
+                $query->where(function($q) use ($user, $scopedIds) {
+                    $q->whereIn('employee_id', $scopedIds)
+                        ->orWhere('approver_id', $user->id)
                         ->orWhere('employee_id', $user->id);
                 });
             } else {
@@ -670,14 +977,33 @@ class RequestManager extends Component
 
         $requests = $query->orderBy('created_at', 'desc')->paginate(15);
 
-        $requestableEmployees = ($user->isAdmin() || $user->isHrManager() || $user->isManager())
-            ? User::where('status', 'Active')->orderBy('name')->get()
-            : collect([$user]);
+        if ($user->isAdmin() || $user->isHrManager()) {
+            $requestableEmployees = User::where('status', 'Active')->orderBy('name')->get();
+        } elseif ($user->isManager() && $user->canManagerDo('manage_time_off')) {
+            $scopedIds = $user->getAccessibleEmployeeIds();
+            $requestableEmployees = User::whereIn('id', $scopedIds)->where('status', 'Active')->orderBy('name')->get();
+        } else {
+            $requestableEmployees = collect([$user]);
+        }
 
         $empPolicies = TimeOffPolicyEmployee::with('policy')
             ->where('employee_id', $this->selected_employee_id)
             ->whereHas('policy', fn($q) => $q->where('active', true))
             ->get();
+
+        // Ensure active Unpaid Time Off policies are always requestable
+        $unpaidPolicies = TimeOffPolicy::where('active', true)->where('policy_type', 2)->get();
+        foreach ($unpaidPolicies as $up) {
+            if (!$empPolicies->contains(fn($ep) => $ep->policy_id === $up->id)) {
+                $virtualEnrollment = new TimeOffPolicyEmployee([
+                    'employee_id'     => $this->selected_employee_id,
+                    'policy_id'       => $up->id,
+                    'hours_remaining' => 0,
+                ]);
+                $virtualEnrollment->setRelation('policy', $up);
+                $empPolicies->push($virtualEnrollment);
+            }
+        }
 
         return view('livewire.time-off.request-manager', [
             'requests'             => $requests,

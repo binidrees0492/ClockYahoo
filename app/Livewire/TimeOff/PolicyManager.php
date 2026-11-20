@@ -12,6 +12,7 @@ class PolicyManager extends Component
 
     public $search = '';
     public $type_filter = '';
+    public $includeDeleted = false;
     public $isModalOpen = false;
     public $modalMode = 'add'; // add or edit
 
@@ -115,13 +116,48 @@ class PolicyManager extends Component
 
     public function delete($id)
     {
-        TimeOffPolicy::findOrFail($id)->delete();
+        $policy = TimeOffPolicy::findOrFail($id);
+
+        $hasEmployees = \App\Models\TimeOffPolicyEmployee::where('policy_id', $id)->exists();
+        $hasRequests  = \App\Models\TimeOffRequest::where('policy_id', $id)->exists();
+
+        if ($hasEmployees || $hasRequests) {
+            $policy->update(['active' => false]);
+            session()->flash('message', "Policy '{$policy->name}' has enrolled employees or time off requests and cannot be deleted. Marked as inactive instead to preserve database integrity.");
+            return;
+        }
+
+        $policy->delete();
         session()->flash('message', 'Policy removed.');
+    }
+
+        public function restorePolicy($id)
+    {
+        if (!auth()->user()?->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can restore records.');
+        }
+        $policy = TimeOffPolicy::findOrFail($id);
+        $policy->update(['active' => true]);
+        session()->flash('message', "Policy '{$policy->name}' restored successfully.");
+    }
+
+    public function permanentlyDeletePolicy($id)
+    {
+        if (!auth()->user()?->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can permanently delete records.');
+        }
+        $policy = TimeOffPolicy::findOrFail($id);
+        \App\Models\TimeOffPolicyEmployee::where('policy_id', $policy->id)->delete();
+        \App\Models\TimeOffRequest::where('policy_id', $policy->id)->delete();
+        $name = $policy->name;
+        $policy->delete();
+        session()->flash('message', "Policy '{$name}' and enrolled employees/requests permanently deleted.");
     }
 
     public function render()
     {
         $policies = TimeOffPolicy::withCount('policyEmployees')
+            ->when(!$this->includeDeleted || !auth()->user()?->isSuperAdmin(), fn($q) => $q->where('active', true))
             ->when($this->search, fn($q) => $q->where('name', 'like', '%' . trim($this->search) . '%'))
             ->when($this->type_filter !== '', fn($q) => $q->where('policy_type', $this->type_filter))
             ->orderBy('name')

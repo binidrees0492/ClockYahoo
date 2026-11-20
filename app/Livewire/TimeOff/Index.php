@@ -17,6 +17,10 @@ class Index extends Component
     // Add this to catch the route parameter
     public function mount($tab = 'requests')
     {
+        if ($tab === 'policies' && !auth()->user()->canAccessAdmin()) {
+            abort(403, 'Unauthorized access to Time Off Policies.');
+        }
+
         $this->tab = $tab;
     }
 
@@ -113,7 +117,19 @@ class Index extends Component
 
     public function deletePolicy($id)
     {
-        TimeOffPolicy::find($id)?->delete();
+        $policy = TimeOffPolicy::find($id);
+        if (!$policy) return;
+
+        $hasEmployees = \App\Models\TimeOffPolicyEmployee::where('policy_id', $id)->exists();
+        $hasRequests  = \App\Models\TimeOffRequest::where('policy_id', $id)->exists();
+
+        if ($hasEmployees || $hasRequests) {
+            $policy->update(['active' => false]);
+            $this->toast("Policy '{$policy->name}' has enrolled employees or requests and cannot be deleted. Marked as inactive instead to preserve data integrity.", 'warning');
+            return;
+        }
+
+        $policy->delete();
         $this->toast('Policy deleted.');
     }
 

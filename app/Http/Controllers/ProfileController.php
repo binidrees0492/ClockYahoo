@@ -26,7 +26,23 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $validated = $request->validated();
+
+        // Standard employees cannot edit their email or role
+        if ($request->user()->isEmployee()) {
+            unset($validated['email']);
+            unset($validated['role']);
+        }
+
+        if ($request->hasFile('avatar')) {
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $request->user()->avatar = $path;
+        } elseif ($request->filled('remove_avatar')) {
+            $request->user()->avatar = null;
+        }
+        unset($validated['avatar']);
+
+        $request->user()->fill($validated);
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
@@ -42,6 +58,11 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        // Corporate policy: Standard employees cannot delete their account
+        if ($request->user()->isEmployee()) {
+            abort(403, 'Employees are not permitted to delete their account. Please contact an administrator.');
+        }
+
         $request->validateWithBag('userDeletion', [
             'password' => ['required', 'current_password'],
         ]);
@@ -50,7 +71,16 @@ class ProfileController extends Controller
 
         Auth::logout();
 
-        $user->delete();
+        $hasTimeLogs      = \App\Models\TimeLog::where('employee_id', $user->id)->exists();
+        $hasSchedules     = \App\Models\Schedule::where('employee_id', $user->id)->exists();
+        $hasAssignments   = \App\Models\Assignment::where('employee_id', $user->id)->exists();
+        $hasDirectReports = \App\Models\User::where('manager_id', $user->id)->exists();
+
+        if ($hasTimeLogs || $hasSchedules || $hasAssignments || $hasDirectReports) {
+            $user->update(['status' => 'Inactive']);
+        } else {
+            $user->delete();
+        }
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

@@ -56,4 +56,18 @@ Route::middleware('auth')->group(function () {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
+
+    // WebAuthn Passkeys Registration & Management
+    Route::post('webauthn/register/options', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'options'])
+        ->name('webauthn.register.options');
+    Route::post('webauthn/register', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'register'])
+        ->name('webauthn.register');
+    Route::delete('webauthn/credentials/{id}', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'destroy'])
+        ->name('webauthn.destroy');
 });
+
+// WebAuthn Passkeys Quick Login (Public)
+Route::post('webauthn/login/options', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'options'])
+    ->name('webauthn.login.options');
+Route::post('webauthn/login', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'login'])
+    ->name('webauthn.login');

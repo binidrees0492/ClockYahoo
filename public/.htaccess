@@ -3,6 +3,9 @@
         Options -MultiViews -Indexes
     </IfModule>
 
+    # Allow Apache to follow the public/storage symlink safely on cPanel/shared hosting
+    Options +SymLinksIfOwnerMatch
+
     RewriteEngine On
 
     # Handle Authorization Header

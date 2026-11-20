@@ -61,8 +61,12 @@
 
             {{-- Financial Group --}}
             <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Financial</h3>
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Financial & Payroll</h3>
                 <ul class="space-y-4">
+                    <li>
+                        <button wire:click="setTab('PayrollReport')" class="text-left font-semibold text-cs-blue hover:underline">Payroll Report 2025</button>
+                        <p class="text-xs text-gray-600 mt-1">Detailed 20-column Payroll export with regular, overtime, sick, vacation hours and rates.</p>
+                    </li>
                     <li>
                         <button wire:click="setTab('Quote')" class="text-left font-semibold text-cs-blue hover:underline">Quotes</button>
                         <p class="text-xs text-gray-600 mt-1">Contact information and amounts due for quotes.</p>
@@ -175,7 +179,7 @@
                 @endif
 
                 <!-- Employee Filter Block -->
-                @if(in_array($currentTab, ['QuickSummary', 'JobDetail', 'JobSummary', 'EmployeeDetail', 'EmployeeSummary', 'TaskDetail', 'TaskSummary', 'TimeSheet', 'Pto', 'TimeSheetAlerts', 'PayRate', 'CsvExport']))
+                @if(in_array($currentTab, ['QuickSummary', 'JobDetail', 'JobSummary', 'EmployeeDetail', 'EmployeeSummary', 'TaskDetail', 'TaskSummary', 'TimeSheet', 'Pto', 'TimeSheetAlerts', 'PayRate', 'CsvExport', 'PayrollReport']))
                     <div class="border-t pt-4">
                         <div class="flex items-center mb-2">
                             <input type="checkbox" wire:model.live="filterEmployees" class="rounded border-gray-300 text-blue-600">
@@ -193,7 +197,7 @@
                 @endif
 
                 <!-- Job Filter Block -->
-                @if(in_array($currentTab, ['QuickSummary', 'JobDetail', 'TimeSheetAlerts', 'PayRate']))
+                @if(in_array($currentTab, ['QuickSummary', 'JobDetail', 'JobSummary', 'TimeSheet', 'TimeSheetAlerts', 'PayRate', 'CsvExport']))
                     <div class="border-t pt-4">
                         <div class="flex items-center mb-2">
                             <input type="checkbox" wire:model.live="filterJobs" class="rounded border-gray-300 text-blue-600">
@@ -211,7 +215,7 @@
                 @endif
 
                 <!-- Task Filter Block -->
-                @if(in_array($currentTab, ['QuickSummary', 'TaskDetail', 'PayRate']))
+                @if(in_array($currentTab, ['QuickSummary', 'TaskDetail', 'TaskSummary', 'JobDetail', 'TimeSheet', 'PayRate', 'CsvExport']))
                     <div class="border-t pt-4">
                         <div class="flex items-center mb-2">
                             <input type="checkbox" wire:model.live="filterTasks" class="rounded border-gray-300 text-blue-600">

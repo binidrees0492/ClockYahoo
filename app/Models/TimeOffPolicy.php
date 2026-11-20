@@ -29,7 +29,7 @@ class TimeOffPolicy extends Model
         'policy_type'         => 'integer',
         'accrual_method'      => 'integer',
         'is_time_off_limit'   => 'boolean',
-        'accrual_hours'       => 'decimal:2',
+        'accrual_hours'       => 'decimal:5',
         'is_waiting_period'   => 'boolean',
         'waiting_period_days' => 'integer',
         'is_carryover_limit'  => 'boolean',

@@ -4,7 +4,9 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Livewire\Attributes\On;
 use App\Models\Assignment;
+use App\Models\CompanySetting;
 use App\Models\Task;
 use App\Models\TimeLog;
 use App\Models\TimeLogNote;
@@ -28,9 +30,26 @@ class TimeClock extends Component
     public $hours = '00';
     public $minutes = '00';
     public $seconds = '00';
+    public $hoursPercent = 0;
+    public $minutesPercent = 0;
+    public $secondsPercent = 0;
+
     public $breakHours = '00';
     public $breakMinutes = '00';
     public $breakSeconds = '00';
+
+    public $clockInEpoch = null;
+    public $shiftClockInEpoch = null;
+    public $shiftPriorNetSeconds = 0;
+    public $completedBreakSeconds = 0;
+    public $breakStartEpoch = null;
+    public $serverEpoch = null;
+
+    public $startedAtText = 'Not Clocked In';
+    public $shiftStartedAtText = '';
+    public $hasSwitched = false;
+    public $activeJobName = '';
+    public $activeTaskName = '';
 
     public $isOnBreak = false;
     public $isActive = false;
@@ -42,6 +61,9 @@ class TimeClock extends Component
     public $switchAssignment = null;
     public $switchTask = null;
 
+    public $showAddNote = false;
+    public $showAddAttachment = false;
+
     public $noteDraft = '';
     public $attachmentDrafts = [];
     public $activeNotes = [];
@@ -51,38 +73,115 @@ class TimeClock extends Component
 
     public function mount()
     {
-        $this->assignments = Assignment::orderBy('name')->get();
-        $this->tasks       = Task::orderBy('name')->get();
+        $user = Auth::user();
+        $this->assignments = $user ? $user->getAssignedJobs() : Assignment::ongoing()->orderBy('name')->get();
+        $this->tasks       = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
 
         $this->refreshState();
     }
 
+    #[On('timezone-changed')]
+    public function onTimezoneChanged($timezone = null)
+    {
+        $this->refreshState();
+    }
+
+    public function toggleAddNote()
+    {
+        $this->showAddNote = !$this->showAddNote;
+    }
+
+    public function toggleAddAttachment()
+    {
+        $this->showAddAttachment = !$this->showAddAttachment;
+    }
+
     public function refreshState()
     {
+        $user = Auth::user();
+        $activeTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
+        $tzAbbr = $user ? $user->getTimezoneAbbr() : 'UTC';
+
+        $this->assignments = $user ? $user->getAssignedJobs() : Assignment::ongoing()->orderBy('name')->get();
+        $this->tasks       = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
+
         $log = TimeLog::where('employee_id', Auth::id())
+            ->notArchived()
             ->whereNull('clock_out')
+            ->where('status', '!=', 'break')
+            ->with(['assignment', 'task'])
             ->latest()
             ->first();
 
         if (!$log) {
-            $this->activeLogId = null;
-            $this->isActive    = false;
-            $this->isOnBreak   = false;
+            $this->activeLogId          = null;
+            $this->isActive             = false;
+            $this->isOnBreak            = false;
+            $this->startedAtText        = 'Not Clocked In';
+            $this->shiftStartedAtText   = '';
+            $this->hasSwitched          = false;
+            $this->activeJobName        = '';
+            $this->activeTaskName       = '';
+            $this->clockInEpoch         = null;
+            $this->shiftClockInEpoch    = null;
+            $this->shiftPriorNetSeconds = 0;
+            $this->completedBreakSeconds = 0;
+            $this->breakStartEpoch      = null;
+            $this->serverEpoch          = Carbon::now()->getTimestampMs();
             $this->resetTimer();
             $this->loadRecentActivity();
             return;
         }
 
-        $this->activeLogId = $log->id;
-        $this->isActive    = true;
-        $this->isOnBreak   = $log->isOnBreak();
+        $this->activeLogId    = $log->id;
+        $this->isActive       = true;
+        $this->isOnBreak      = $log->isOnBreak();
+        $this->activeJobName  = $log->assignment?->name ?? '—';
+        $this->activeTaskName = $log->task?->name ?? '—';
 
-        $net = $log->netSeconds();
-        $this->hours   = str_pad(intdiv($net, 3600), 2, '0', STR_PAD_LEFT);
-        $this->minutes = str_pad(intdiv($net % 3600, 60), 2, '0', STR_PAD_LEFT);
-        $this->seconds = str_pad($net % 60, 2, '0', STR_PAD_LEFT);
+        // Calculate Shift-level chain timing
+        $shiftLogs = $log->getShiftLogs();
+        $rootLog   = $shiftLogs->first() ?? $log;
+        $this->hasSwitched = ($shiftLogs->count() > 1);
 
-        $brk = ($log->break_minutes * 60) + $log->currentBreakSeconds();
+        $shiftStart = $rootLog->getClockInCarbon() ?? $log->getClockInCarbon();
+        $this->shiftClockInEpoch = $shiftStart ? $shiftStart->getTimestampMs() : null;
+        $this->clockInEpoch      = $log->getClockInCarbon() ? $log->getClockInCarbon()->getTimestampMs() : null;
+
+        // Sum net seconds from previous completed segments in this same shift
+        $priorSecs = 0;
+        foreach ($shiftLogs as $sLog) {
+            if ($sLog->id !== $log->id) {
+                $priorSecs += $sLog->netSeconds();
+            }
+        }
+        $this->shiftPriorNetSeconds  = $priorSecs;
+        $this->completedBreakSeconds = $log->completedBreakSeconds();
+        $this->breakStartEpoch       = $log->getBreakStartedAtCarbon() ? $log->getBreakStartedAtCarbon()->getTimestampMs() : null;
+        $this->serverEpoch           = Carbon::now()->getTimestampMs();
+
+        $clockInUserTz = $log->getClockInCarbon() ? $log->getClockInCarbon()->copy()->setTimezone($activeTz) : null;
+        $shiftStartUserTz = $shiftStart ? $shiftStart->copy()->setTimezone($activeTz) : null;
+
+        if ($this->hasSwitched) {
+            $this->startedAtText      = 'Current Task: ' . ($clockInUserTz ? $clockInUserTz->format('g:i A') . " ({$tzAbbr})" : '—');
+            $this->shiftStartedAtText = 'Shift Started: ' . ($shiftStartUserTz ? $shiftStartUserTz->format('D n/j @ g:i A') . " ({$tzAbbr})" : '—') . ' (' . $shiftLogs->count() . ' segments logged)';
+        } else {
+            $this->startedAtText      = 'Started ' . ($clockInUserTz ? $clockInUserTz->format('D n/j @ g:i A') . " ({$tzAbbr})" : '—');
+            $this->shiftStartedAtText = '';
+        }
+
+        // Shift total net seconds (prior switched tasks + current active task net seconds)
+        $totalShiftNet = $priorSecs + $log->netSeconds();
+        $this->hours   = str_pad(intdiv($totalShiftNet, 3600), 2, '0', STR_PAD_LEFT);
+        $this->minutes = str_pad(intdiv($totalShiftNet % 3600, 60), 2, '0', STR_PAD_LEFT);
+        $this->seconds = str_pad($totalShiftNet % 60, 2, '0', STR_PAD_LEFT);
+
+        $this->secondsPercent = round(((int) $this->seconds / 60) * 100, 1);
+        $this->minutesPercent = round(((int) $this->minutes / 60) * 100, 1);
+        $this->hoursPercent   = min(100, round((((int) $this->hours % 12) / 12) * 100, 1));
+
+        $brk = $log->currentBreakSeconds();
         $this->breakHours   = str_pad(intdiv($brk, 3600), 2, '0', STR_PAD_LEFT);
         $this->breakMinutes = str_pad(intdiv($brk % 3600, 60), 2, '0', STR_PAD_LEFT);
         $this->breakSeconds = str_pad($brk % 60, 2, '0', STR_PAD_LEFT);
@@ -107,33 +206,89 @@ class TimeClock extends Component
 
     private function loadRecentActivity()
     {
+        $user = Auth::user();
+        $activeTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
+
         $this->recentActivity = TimeLog::where('employee_id', Auth::id())
+            ->notArchived()
+            ->where('status', '!=', 'break')
+            ->with(['assignment', 'task'])
             ->orderByDesc('clock_in')
-            ->limit(5)
+            ->limit(8)
             ->get()
-            ->map(fn ($l) => [
-                'id'        => $l->id,
-                'in'        => $l->clock_in?->toIso8601String(),
-                'out'       => $l->clock_out?->toIso8601String(),
-                'is_manual' => $l->isManual(),
-            ])
+            ->map(function ($l) use ($activeTz) {
+                $inCarbon = $l->getClockInCarbon();
+                $outCarbon = $l->getClockOutCarbon();
+                $inFormatted = $inCarbon ? $inCarbon->copy()->setTimezone($activeTz)->format('D n/j @ g:i A') : '—';
+                $outFormatted = $outCarbon ? $outCarbon->copy()->setTimezone($activeTz)->format('D n/j @ g:i A') : ($l->clock_out ? '—' : 'In Progress...');
+
+                return [
+                    'id'                   => $l->id,
+                    'in'                   => $inCarbon?->toIso8601String(),
+                    'in_formatted'         => $inFormatted,
+                    'out'                  => $outCarbon?->toIso8601String(),
+                    'out_formatted'        => $outFormatted,
+                    'status'               => $l->status,
+                    'is_active'            => is_null($l->clock_out),
+                    'is_switched'          => ($l->status === 'switched'),
+                    'break_minutes'        => (int) round($l->completedBreakSeconds() / 60),
+                    'duration_minutes'     => $l->duration_minutes,
+                    'is_manual'            => $l->isManual(),
+                    'is_unusual'           => (bool) $l->is_unusual,
+                    'unusual_reason'       => $l->unusual_reason,
+                    'location_flagged'     => (bool) $l->location_flagged,
+                    'location_flag_reason' => $l->location_flag_reason,
+                    'approved'             => (bool) $l->approved,
+                    'is_rejected'          => $l->isRejected(),
+                    'action_requested'     => (bool) $l->isActionRequested(),
+                    'clock_in_latitude'    => $l->clock_in_latitude,
+                    'clock_in_longitude'   => $l->clock_in_longitude,
+                    'task_gps_policy'      => $l->task?->gps_policy ?? 'none',
+                    'job_name'             => $l->assignment?->name ?? 'Job',
+                    'task_name'            => $l->task?->name ?? 'Task',
+                    'task_radius'          => $l->task?->geofence_radius ?? 200,
+                ];
+            })
             ->toArray();
     }
 
     private function resetTimer()
     {
         $this->hours = $this->minutes = $this->seconds = '00';
+        $this->hoursPercent = $this->minutesPercent = $this->secondsPercent = 0;
         $this->breakHours = $this->breakMinutes = $this->breakSeconds = '00';
         $this->activeNotes = [];
         $this->activeAttachments = [];
     }
 
-    public function clockIn()
+    public function clockIn($lat = null, $lng = null)
     {
+        if (!Auth::user()->canWebClock()) {
+            $this->toast('Web browser time clocking is disabled for your account. Please use the mobile app.', 'error');
+            return;
+        }
+
         $this->validate([
             'selectedAssignment' => 'required|exists:tbl_assignments,id',
             'selectedTask'       => 'required|exists:tbl_tasks,id',
+        ], [
+            'selectedAssignment.required' => 'Please select a job to clock in.',
+            'selectedTask.required'       => 'A job cannot be started unless a task is selected too.',
         ]);
+
+        $ongoingAssignment = Assignment::ongoing()->find($this->selectedAssignment);
+        $ongoingTask = Task::ongoing()->find($this->selectedTask);
+
+        if (!$ongoingAssignment || !$ongoingTask) {
+            $this->toast('You can only clock in to ongoing tasks and jobs.', 'error');
+            return;
+        }
+
+        if ($ongoingTask->assignment_id && (int) $ongoingTask->assignment_id !== (int) $ongoingAssignment->id) {
+            $this->addError('selectedTask', 'The selected task does not belong to this job.');
+            $this->toast('The selected task does not belong to the selected job.', 'error');
+            return;
+        }
 
         $existing = TimeLog::where('employee_id', Auth::id())
             ->whereNull('clock_out')
@@ -144,19 +299,126 @@ class TimeClock extends Component
             return;
         }
 
-        TimeLog::create([
-            'employee_id'   => Auth::id(),
-            'assignment_id' => $this->selectedAssignment,
-            'task_id'       => $this->selectedTask,
-            'clock_in'      => Carbon::now(),
-            'status'        => 'active',
+        $user = Auth::user();
+        if ($user && $user->isEmployee() && !$user->canAccessAdmin()) {
+            $assignedJobIds = $user->getAssignedJobs()->pluck('id')->toArray();
+            $assignedTaskIds = $user->getAssignedTasks()->pluck('id')->toArray();
+
+            if (!in_array((int) $this->selectedAssignment, $assignedJobIds, true)) {
+                $this->toast('You are only allowed to clock in to jobs assigned to you.', 'error');
+                return;
+            }
+            if (!in_array((int) $this->selectedTask, $assignedTaskIds, true)) {
+                $this->toast('You are only allowed to clock in to tasks assigned to you.', 'error');
+                return;
+            }
+        }
+
+        $today = Carbon::today()->toDateString();
+        $schedule = \App\Models\Schedule::where('employee_id', Auth::id())
+            ->where(function ($q) {
+                $q->where('status', 'published')->orWhere('is_published', true);
+            })
+            ->whereDate('shift_date', $today)
+            ->first();
+
+        $hasDraftShiftToday = \App\Models\Schedule::where('employee_id', Auth::id())
+            ->whereDate('shift_date', $today)
+            ->where(function ($q) {
+                $q->where('status', 'draft')->orWhere('is_published', false);
+            })
+            ->exists();
+
+        if ($hasDraftShiftToday && !$schedule) {
+            $this->toast('Your scheduled shift for today is currently in draft. You can only log time once your schedule has been published.', 'error');
+            return;
+        }
+
+        if (CompanySetting::get('require_published_schedule', false) && !$schedule) {
+            $this->toast('You can only log time if you have a published schedule against your name.', 'error');
+            return;
+        }
+
+        $task = \App\Models\Task::find($this->selectedTask);
+
+        // Location Check & Policy Enforcement (Task policy off by default, GPS N/A flagged)
+        $locCheck = \App\Services\TimeLogComplianceService::checkLocation(
+            Auth::user(),
+            $schedule,
+            $lat ? (float) $lat : null,
+            $lng ? (float) $lng : null,
+            $task
+        );
+
+        $now = Carbon::now();
+        $shiftId = 'shift_' . Auth::id() . '_' . $now->timestamp;
+
+        $log = TimeLog::create([
+            'employee_id'          => Auth::id(),
+            'shift_id'             => $shiftId,
+            'assignment_id'        => $this->selectedAssignment,
+            'task_id'              => $this->selectedTask,
+            'hourly_rate'          => $task ? $task->getHourlyRateFor(Auth::user()) : (Auth::user()->base_pay ?: null),
+            'timezone'             => CompanySetting::getServerTimezone() ?: config('app.timezone', 'America/New_York'),
+            'clock_in'             => $now,
+            'status'               => 'active',
+            'clock_in_latitude'    => $lat ? (float) $lat : null,
+            'clock_in_longitude'   => $lng ? (float) $lng : null,
+            'location_flagged'     => $locCheck['flagged'],
+            'location_flag_reason' => $locCheck['reason'],
+            'is_unusual'           => $locCheck['flagged'],
+            'unusual_reason'       => $locCheck['flagged'] ? $locCheck['reason'] : null,
         ]);
 
+        try {
+            \App\Services\NotificationRoutingService::notifyClockActivity($log, 'clock_in');
+            if ($locCheck['flagged']) {
+                \App\Services\NotificationRoutingService::send(
+                    'geofence_breach',
+                    [
+                        'title'   => 'Geofence Alert: ' . Auth::user()->name,
+                        'message' => Auth::user()->name . ' clocked in with location discrepancy: ' . $locCheck['reason'],
+                        'link'    => '/timesheets',
+                        'type'    => 'geofence_breach',
+                    ],
+                    Auth::user()
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Clock-in notification error: " . $e->getMessage());
+        }
+
         $this->refreshState();
-        $this->toast('Clocked in successfully.');
+        if ($locCheck['flagged']) {
+            $this->toast('Clocked in (' . $locCheck['reason'] . ')', 'error');
+        } else {
+            $this->toast('Clocked in successfully.');
+        }
     }
 
-    public function clockOut()
+    public function updatedSelectedAssignment($assignmentId)
+    {
+        $user = Auth::user();
+        if ($assignmentId) {
+            $this->tasks = $user ? $user->getAssignedTasks((int) $assignmentId) : Task::ongoing()->where('assignment_id', $assignmentId)->orderBy('name')->get();
+        } else {
+            $this->tasks = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
+        }
+        $this->selectedTask = null;
+    }
+
+    public function updatedSwitchAssignment($assignmentId)
+    {
+        $user = Auth::user();
+        if ($assignmentId) {
+            $this->tasks = $user ? $user->getAssignedTasks((int) $assignmentId) : Task::ongoing()->where('assignment_id', $assignmentId)->orderBy('name')->get();
+        } else {
+            $this->tasks = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
+        }
+        $this->switchTask = null;
+    }
+
+    public function clockOut($lat = null, $lng = null)
     {
         $log = TimeLog::where('employee_id', Auth::id())
             ->whereNull('clock_out')
@@ -168,20 +430,86 @@ class TimeClock extends Component
             return;
         }
 
+        $clockIn = $log->getClockInCarbon() ?: $log->clock_in;
+        $now = Carbon::now($log->getLogTimezone());
+        $elapsedSeconds = $clockIn ? abs($now->getTimestamp() - $clockIn->getTimestamp()) : 999;
+        if ($elapsedSeconds < 60) {
+            $remaining = 60 - $elapsedSeconds;
+            $this->toast("Please wait at least 1 minute after clocking in before clocking out to avoid accidental double-clicks ({$remaining}s remaining).", 'warning');
+            return;
+        }
+
+        $today = Carbon::today()->toDateString();
+        $schedule = \App\Models\Schedule::where('employee_id', Auth::id())
+            ->where(function ($q) {
+                $q->where('status', 'published')->orWhere('is_published', true);
+            })
+            ->whereDate('shift_date', $today)
+            ->first();
+
+        $task = $log->task;
+
+        // Location Check & Policy Enforcement
+        $locCheck = \App\Services\TimeLogComplianceService::checkLocation(
+            Auth::user(),
+            $schedule,
+            $lat ? (float) $lat : null,
+            $lng ? (float) $lng : null,
+            $task
+        );
+
+        if (!$locCheck['allowed']) {
+            $this->toast($locCheck['reason'] ?: 'Clock-out blocked by location policy.', 'error');
+            return;
+        }
+
         if ($log->isOnBreak()) {
-            $log->break_minutes += (int) ceil($log->break_started_at->diffInMinutes(Carbon::now()));
+            $breakStart = $log->getBreakStartedAtCarbon();
+            $now        = Carbon::now($log->getLogTimezone());
+            $diffSecs   = $breakStart ? abs($now->getTimestamp() - $breakStart->getTimestamp()) : 0;
+            $breaks     = $log->breaks ?? [];
+            $breaks[]   = [
+                'start'   => $breakStart ? $breakStart->toIso8601String() : $now->toIso8601String(),
+                'end'     => $now->toIso8601String(),
+                'seconds' => $diffSecs,
+                'minutes' => (int) round($diffSecs / 60),
+            ];
+            $log->breaks          = $breaks;
+            $log->break_minutes   = (int) round($log->completedBreakSeconds() / 60);
             $log->break_started_at = null;
         }
 
-        $log->clock_out        = Carbon::now();
-        $log->duration_minutes = (int) ceil($log->netSeconds() / 60);
-        $log->status           = 'completed';
+        $log->clock_out           = Carbon::now($log->getLogTimezone());
+        $log->duration_minutes    = (int) ceil($log->netSeconds() / 60);
+        $log->status              = 'completed';
+        $log->clock_out_latitude  = $lat ? (float) $lat : null;
+        $log->clock_out_longitude = $lng ? (float) $lng : null;
+
+        if ($locCheck['flagged']) {
+            $log->location_flagged = true;
+            $log->location_flag_reason = ($log->location_flag_reason ? $log->location_flag_reason . ' | ' : '') . $locCheck['reason'];
+        }
+
         $log->save();
+
+        // Evaluate Unusual Activity & Notify HR to approve (Requirements 2 & 5)
+        \App\Services\TimeLogComplianceService::processTimeLogSubmission($log);
+
+        try {
+            \App\Services\NotificationRoutingService::notifyClockActivity($log, 'clock_out');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Clock-out notification error: " . $e->getMessage());
+        }
 
         $this->refreshState();
         $this->selectedAssignment = null;
         $this->selectedTask       = null;
-        $this->toast('Clocked out successfully.');
+
+        if ($log->is_unusual) {
+            $this->toast("Clocked out. Unusual shift activity flagged: {$log->unusual_reason}", 'error');
+        } else {
+            $this->toast('Clocked out successfully. Submitted to HR for review.');
+        }
     }
 
     public function startBreak()
@@ -189,7 +517,7 @@ class TimeClock extends Component
         $log = $this->currentLog();
         if (!$log || $log->isOnBreak()) return;
 
-        $log->break_started_at = Carbon::now();
+        $log->break_started_at = Carbon::now($log->getLogTimezone());
         $log->status           = 'on_break';
         $log->save();
 
@@ -202,14 +530,27 @@ class TimeClock extends Component
         $log = $this->currentLog();
         if (!$log || !$log->isOnBreak()) return;
 
-        $minutes = (int) ceil($log->break_started_at->diffInMinutes(Carbon::now()));
-        $log->break_minutes   += $minutes;
+        $breakStart = $log->getBreakStartedAtCarbon();
+        $now        = Carbon::now($log->getLogTimezone());
+        $diffSecs   = $breakStart ? abs($now->getTimestamp() - $breakStart->getTimestamp()) : 0;
+
+        $breaks = $log->breaks ?? [];
+        $breaks[] = [
+            'start'   => $breakStart ? $breakStart->toIso8601String() : $now->toIso8601String(),
+            'end'     => $now->toIso8601String(),
+            'seconds' => $diffSecs,
+            'minutes' => (int) round($diffSecs / 60),
+        ];
+
+        $log->breaks          = $breaks;
+        $log->break_minutes   = (int) round($log->completedBreakSeconds() / 60);
         $log->break_started_at = null;
         $log->status           = 'active';
         $log->save();
 
         $this->refreshState();
-        $this->toast("Break ended ({$minutes} min).");
+        $mins = (int) round($diffSecs / 60);
+        $this->toast("Break ended ({$mins} min). Resumed work.");
     }
 
     public function openSwitchModal()
@@ -234,7 +575,39 @@ class TimeClock extends Component
         $this->validate([
             'switchAssignment' => 'required|exists:tbl_assignments,id',
             'switchTask'       => 'required|exists:tbl_tasks,id',
+        ], [
+            'switchAssignment.required' => 'Please select a job to switch.',
+            'switchTask.required'       => 'A job cannot be started unless a task is selected too.',
         ]);
+
+        $user = Auth::user();
+        if ($user && $user->isEmployee() && !$user->canAccessAdmin()) {
+            $assignedJobIds = $user->getAssignedJobs()->pluck('id')->toArray();
+            $assignedTaskIds = $user->getAssignedTasks()->pluck('id')->toArray();
+
+            if (!in_array((int) $this->switchAssignment, $assignedJobIds, true)) {
+                $this->toast('You are only allowed to switch to jobs assigned to you.', 'error');
+                return;
+            }
+            if (!in_array((int) $this->switchTask, $assignedTaskIds, true)) {
+                $this->toast('You are only allowed to switch to tasks assigned to you.', 'error');
+                return;
+            }
+        }
+
+        $ongoingAssignment = Assignment::ongoing()->find($this->switchAssignment);
+        $ongoingTask = Task::ongoing()->find($this->switchTask);
+
+        if (!$ongoingAssignment || !$ongoingTask) {
+            $this->toast('You can only switch to ongoing tasks and jobs.', 'error');
+            return;
+        }
+
+        if ($ongoingTask->assignment_id && (int) $ongoingTask->assignment_id !== (int) $ongoingAssignment->id) {
+            $this->addError('switchTask', 'The selected task does not belong to this job.');
+            $this->toast('The selected task does not belong to the selected job.', 'error');
+            return;
+        }
 
         $log = $this->currentLog();
         if (!$log) {
@@ -355,14 +728,16 @@ class TimeClock extends Component
     {
         return TimeLog::where('employee_id', Auth::id())
             ->whereNull('clock_out')
+            ->where('status', '!=', 'break')
             ->latest()
             ->first();
     }
 
     private function toast(string $msg, string $type = 'success')
     {
-        $this->toastMessage = $msg;
+        $this->toastMessage = null;
         $this->toastType    = $type;
+        $this->dispatch('toast', message: $msg, type: $type);
     }
 
     public function dismissToast()

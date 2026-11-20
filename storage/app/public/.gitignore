@@ -1,2 +1,6 @@
 *
 !.gitignore
+!company/
+!company/*
+!avatars/
+!avatars/*

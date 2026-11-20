@@ -7,7 +7,27 @@
     @endif
 
     {{-- TITLE --}}
-    <h1 class="text-4xl font-light text-gray-800 mb-6">{{ $titleLabel }}</h1>
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-3xl font-light text-gray-800">{{ $titleLabel }}</h1>
+            @if($policyId)
+                <p class="text-xs text-gray-500 mt-0.5">Editing policy configuration &bull; Click any step to jump or Save Policy when done.</p>
+            @endif
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('timeoff.policies') }}" class="px-3 py-1.5 border border-gray-300 rounded text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                Cancel
+            </a>
+            @if($policyId)
+                <button wire:click="quickSave" type="button" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-xs font-semibold shadow flex items-center gap-1.5 transition">
+                    <span>✓</span> Save Policy
+                </button>
+                <button wire:click="confirmDelete" type="button" class="text-red-600 hover:text-red-800 hover:bg-red-50 border border-red-200 px-3 py-1.5 rounded text-xs font-semibold transition ml-2">
+                    Delete Policy
+                </button>
+            @endif
+        </div>
+    </div>
 
     {{-- WIZARD STEPS --}}
     <div class="w-full mb-8">
@@ -32,7 +52,8 @@
                 @endphp
 
                 {{-- Main step block --}}
-                <div class="relative flex items-center justify-center px-6 py-3
+                <div @if($policyId) wire:click="goToStep('{{ $s['key'] }}')" @endif
+                     class="relative flex items-center justify-center px-6 py-3 {{ $policyId ? 'cursor-pointer hover:opacity-90' : '' }}
                     {{ $isCurrent ? 'bg-cs-blue text-white font-semibold' : '' }}
                     {{ $isDone    ? 'bg-[#e8eef5] text-cs-blue' : '' }}
                     {{ $isFuture  ? 'bg-[#f2f4f7] text-gray-500' : '' }}"
@@ -124,7 +145,7 @@
                             {{ (int)$policyAccrualMethod === 3 ? 'Fraction Earned Per Hour Worked' : ((int)$policyAccrualMethod === 0 ? 'Total Per Period' : 'Total Per Year') }}
                         </label>
                         <div class="flex max-w-xs">
-                            <input type="number" step="0.01" wire:model="policyAccrualHours"
+                            <input type="number" step="0.00001" wire:model="policyAccrualHours"
                                    class="flex-1 border border-gray-300 rounded-l px-3 py-2 text-sm">
                             <span class="inline-flex items-center px-3 bg-gray-50 border border-l-0 border-gray-300 rounded-r text-sm text-gray-600">Hours</span>
                         </div>
@@ -140,7 +161,7 @@
                 </button>
 
                 @if((int)$policyType === 2)
-                    <button wire:click="goToAdditionalSettings"
+                    <button wire:click="saveAndGoToEmployeeSelection"
                             class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                         Save and go to Employee Selection &#8594;
                     </button>
@@ -289,9 +310,9 @@
             @endif
 
             <div class="flex items-center gap-3 pt-2">
-                <button wire:click="goBackToPolicyDetails"
+                <button wire:click="goBackFromEmployeeSelection"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
-                    &#8592; Back to View Policy
+                    &#8592; {{ (int)$policyType === 2 ? 'Policy Details' : 'Additional Settings' }}
                 </button>
 
                 <button wire:click="goToEmployeeDetails"
@@ -367,6 +388,22 @@
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     Save and Return to Policy Details &#8594;
                 </button>
+            </div>
+        </div>
+    @endif
+
+    {{-- Delete Policy Confirmation Modal --}}
+    @if($showDeleteModal)
+        <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 text-sm">
+                <h3 class="text-base font-bold text-gray-800 mb-2">Delete Time Off Policy</h3>
+                <p class="text-gray-600 text-xs mb-4">
+                    Are you sure you want to permanently delete <strong>{{ $policyName }}</strong>? All employee enrollments for this policy will also be removed.
+                </p>
+                <div class="flex justify-end gap-2">
+                    <button wire:click="cancelDelete" type="button" class="px-4 py-2 border border-gray-300 rounded text-xs text-gray-700 hover:bg-gray-100">Cancel</button>
+                    <button wire:click="deletePolicy" type="button" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-xs font-semibold shadow">Confirm Delete</button>
+                </div>
             </div>
         </div>
     @endif

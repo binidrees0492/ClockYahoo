@@ -26,9 +26,17 @@
                 <option value="2">Unpaid</option>
             </select>
         </div>
-        <button wire:click="$set('search', ''); $set('type_filter', '');" class="text-xs text-[#005b8f] hover:underline font-medium">
-            Clear Filters
-        </button>
+        <div class="flex items-center gap-3">
+            <button wire:click="$set('search', ''); $set('type_filter', '');" class="text-xs text-[#005b8f] hover:underline font-medium">
+                Clear Filters
+            </button>
+            @if(auth()->user()?->isSuperAdmin())
+                <label class="inline-flex items-center gap-1.5 text-xs text-gray-700 font-semibold cursor-pointer select-none bg-gray-50 border border-gray-300 px-3 py-1.5 rounded">
+                    <input type="checkbox" wire:model.live="includeDeleted" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                    <span>🗑️ Include Deleted Records</span>
+                </label>
+            @endif
+        </div>
     </div>
 
     {{-- Policy Table --}}
@@ -72,8 +80,16 @@
                             </span>
                     </td>
                     <td class="p-3 text-right">
-                        <button wire:click="openEditModal({{ $policy->id }})" class="text-[#005b8f] hover:underline text-xs font-semibold mr-3">Edit</button>
-                        <button wire:click="delete({{ $policy->id }})" wire:confirm="Are you sure you want to delete this policy?" class="text-red-500 hover:underline text-xs">Delete</button>
+                        @if($policy->active)
+                            <button wire:click="openEditModal({{ $policy->id }})" class="text-[#005b8f] hover:underline text-xs font-semibold mr-3">Edit</button>
+                            <button wire:click="delete({{ $policy->id }})" wire:confirm="Are you sure you want to delete this policy?" class="text-red-500 hover:underline text-xs">Delete</button>
+                        @else
+                            <span class="text-xs text-gray-400 mr-2">Inactive</span>
+                            @if(auth()->user()?->isSuperAdmin())
+                                <button wire:click="restorePolicy({{ $policy->id }})" class="text-emerald-600 hover:underline text-xs font-semibold mr-3">Restore</button>
+                                <button wire:click="permanentlyDeletePolicy({{ $policy->id }})" wire:confirm="Permanently delete this policy and remove enrolled employees and time-off requests?" class="text-red-700 hover:underline text-xs font-semibold">Delete Permanently</button>
+                            @endif
+                        @endif
                     </td>
                 </tr>
             @empty
@@ -97,76 +113,94 @@
                     <button wire:click="closeModal" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
                 </div>
 
-                <div class="p-6 overflow-y-auto space-y-4 text-sm">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Policy Name *</label>
-                        <input type="text" wire:model="name" placeholder="e.g. Annual Leave, Medical Leave" class="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-[#005b8f]">
-                        @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
+                <div class="p-6 overflow-y-auto text-sm flex-1">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {{-- Section 1: Basic Information & Policy Type --}}
+                        <div class="space-y-3.5 border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-5">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                                <i class="fa-solid fa-file-lines text-[#005b8f]"></i> 1. Policy Details
+                            </h3>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Policy Type *</label>
-                            <select wire:model="policy_type" class="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-[#005b8f]">
-                                <option value="0">PTO</option>
-                                <option value="1">Sick</option>
-                                <option value="2">Unpaid</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Accrual Method *</label>
-                            <select wire:model="accrual_method" class="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-[#005b8f]">
-                                <option value="0">Per Pay Period</option>
-                                <option value="1">First of Year</option>
-                                <option value="2">Anniversary Date</option>
-                                <option value="3">Hours-based</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="border-t pt-3 space-y-3">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model.live="is_time_off_limit" class="rounded text-[#005b8f]">
-                            <span class="font-medium text-gray-700">Limit annual accrual hours</span>
-                        </label>
-                        @if($is_time_off_limit)
-                            <div class="pl-6">
-                                <label class="block text-xs text-gray-500 mb-1">Accrual Hours per Year</label>
-                                <input type="number" step="0.5" wire:model="accrual_hours" class="w-40 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Policy Name *</label>
+                                <input type="text" wire:model="name" placeholder="e.g. Annual Leave, Medical Leave" class="w-full border border-gray-300 rounded p-2 text-xs outline-none focus:border-[#005b8f]">
+                                @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                             </div>
-                        @endif
 
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model.live="is_waiting_period" class="rounded text-[#005b8f]">
-                            <span class="font-medium text-gray-700">Waiting period before requests can be made</span>
-                        </label>
-                        @if($is_waiting_period)
-                            <div class="pl-6">
-                                <label class="block text-xs text-gray-500 mb-1">Days after hire</label>
-                                <input type="number" wire:model="waiting_period_days" class="w-40 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Policy Type *</label>
+                                <select wire:model="policy_type" class="w-full border border-gray-300 rounded p-2 text-xs outline-none focus:border-[#005b8f] bg-white">
+                                    <option value="0">PTO (Paid Time Off)</option>
+                                    <option value="1">Sick Leave</option>
+                                    <option value="2">Unpaid Leave</option>
+                                </select>
                             </div>
-                        @endif
 
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model.live="is_carryover_limit" class="rounded text-[#005b8f]">
-                            <span class="font-medium text-gray-700">Limit hours carried over each year</span>
-                        </label>
-                        @if($is_carryover_limit)
-                            <div class="pl-6">
-                                <label class="block text-xs text-gray-500 mb-1">Max Carryover Hours</label>
-                                <input type="number" wire:model="max_carryover_hours" class="w-40 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Accrual Method *</label>
+                                <select wire:model="accrual_method" class="w-full border border-gray-300 rounded p-2 text-xs outline-none focus:border-[#005b8f] bg-white">
+                                    <option value="0">Per Pay Period</option>
+                                    <option value="1">First of Year</option>
+                                    <option value="2">Anniversary Date</option>
+                                    <option value="3">Hours-based</option>
+                                </select>
                             </div>
-                        @endif
 
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Max Balance Cap (Hours)</label>
-                            <input type="number" wire:model="max_balance_hours" placeholder="e.g. 160" class="w-40 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                            <div class="pt-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" wire:model="active" class="rounded text-[#005b8f]">
+                                    <span class="font-bold text-xs text-gray-800">Policy is Active</span>
+                                </label>
+                            </div>
                         </div>
 
-                        <label class="flex items-center gap-2 cursor-pointer pt-2">
-                            <input type="checkbox" wire:model="active" class="rounded text-[#005b8f]">
-                            <span class="font-medium text-gray-700">Active Policy</span>
-                        </label>
+                        {{-- Section 2: Accrual & Balance Limitations --}}
+                        <div class="space-y-3.5">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                                <i class="fa-solid fa-sliders text-[#005b8f]"></i> 2. Accrual & Balance Limits
+                            </h3>
+
+                            <div>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" wire:model.live="is_time_off_limit" class="rounded text-[#005b8f]">
+                                    <span class="font-medium text-xs text-gray-700">Limit annual accrual hours</span>
+                                </label>
+                                @if($is_time_off_limit)
+                                    <div class="pl-6 mt-1">
+                                        <input type="number" step="0.00001" wire:model="accrual_hours" placeholder="Hours per year" class="w-full border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" wire:model.live="is_waiting_period" class="rounded text-[#005b8f]">
+                                    <span class="font-medium text-xs text-gray-700">Waiting period before requests</span>
+                                </label>
+                                @if($is_waiting_period)
+                                    <div class="pl-6 mt-1">
+                                        <input type="number" wire:model="waiting_period_days" placeholder="Days after hire (e.g. 90)" class="w-full border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" wire:model.live="is_carryover_limit" class="rounded text-[#005b8f]">
+                                    <span class="font-medium text-xs text-gray-700">Limit hours carried over each year</span>
+                                </label>
+                                @if($is_carryover_limit)
+                                    <div class="pl-6 mt-1">
+                                        <input type="number" wire:model="max_carryover_hours" placeholder="Max carryover hours" class="w-full border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Max Balance Cap (Hours)</label>
+                                <input type="number" wire:model="max_balance_hours" placeholder="e.g. 160" class="w-full border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-[#005b8f]">
+                            </div>
+                        </div>
                     </div>
                 </div>
 

@@ -1,0 +1,24 @@
+{
+  "name": "ClockVerse - Time Tracking & Scheduling",
+  "short_name": "ClockVerse",
+  "description": "Mobile time tracking, scheduling, jobs, and time off management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#005a9c",
+  "theme_color": "#005a9c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

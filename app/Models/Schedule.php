@@ -16,14 +16,39 @@ class Schedule extends Model
         'assignment_id',
         'task_id',
         'shift_date',
+        'status',
+        'is_published',
         'start_time',
         'end_time',
+        'break_start',
+        'break_end',
+        'break_minutes',
+        'standard_hours',
+        'latitude',
+        'longitude',
+        'geofence_radius',
+        'location_name',
         'notes',
     ];
 
     protected $casts = [
-        'shift_date' => 'date',
+        'shift_date'      => 'date',
+        'is_published'    => 'boolean',
+        'standard_hours'  => 'decimal:2',
+        'latitude'        => 'float',
+        'longitude'       => 'float',
+        'geofence_radius' => 'integer',
     ];
+
+    public function isPublished(): bool
+    {
+        return $this->status === 'published' || (bool)$this->is_published;
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft' || !(bool)$this->is_published;
+    }
 
     public function employee()
     {

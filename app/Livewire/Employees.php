@@ -4,16 +4,19 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use Livewire\WithFileUploads;
 use App\Models\User;
 use App\Models\Department;
 use App\Models\Location;
 use App\Models\TimeOffPolicy;
+use App\Models\Assignment;
+use App\Models\Task;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class Employees extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     public const ACCESS_NONE     = 0;
     public const ACCESS_READONLY = 1;
@@ -22,12 +25,15 @@ class Employees extends Component
     public $search = '';
     public $department_filter = '';
     public $status_filter = '';
+    public $includeDeleted = false;
 
     public $isModalOpen = false;
     public $modalMode = 'add';
     public $activeTab = 'details';
 
     public $employeeId = null;
+    public $avatarFile = null;
+    public $currentAvatarUrl = null;
     public $first_name = '';
     public $last_name = '';
     public $email = '';
@@ -43,6 +49,9 @@ class Employees extends Component
     public $manager_id = '';
 
     public $permissions = [];
+    public $assigned_jobs = [];
+    public $assigned_tasks = [];
+    public $job_shifts = [];
 
     // Time Off (Live from time_off_policies & time_off_policy_employees)
     public $selectedPolicyToAdd = '';
@@ -56,6 +65,10 @@ class Employees extends Component
 
     public function mount()
     {
+        if (!auth()->user()->canAccessAdmin()) {
+            abort(403, 'Unauthorized access to Employee administration.');
+        }
+
         $this->applyRoleDefaults();
     }
 
@@ -150,8 +163,9 @@ class Employees extends Component
     {
         if (empty($policyId)) return;
 
-        foreach ($this->employeePolicies as $item) {
+        foreach ($this->employeePolicies as $index => $item) {
             if ((string)$item['policy_id'] === (string)$policyId) {
+                $this->employeePolicies[$index]['enrolled'] = true;
                 $this->selectedPolicyToAdd = '';
                 return;
             }
@@ -162,6 +176,8 @@ class Employees extends Component
             $this->employeePolicies[] = [
                 'policy_id'       => $policy->id,
                 'name'            => $policy->name,
+                'type_label'      => $policy->policyTypeLabel(),
+                'enrolled'        => true,
                 'hire_date'       => now()->format('Y-m-d'),
                 'hours_remaining' => 0.00,
             ];
@@ -170,10 +186,18 @@ class Employees extends Component
         $this->selectedPolicyToAdd = '';
     }
 
+    public function togglePolicyEnrollment($index)
+    {
+        if (isset($this->employeePolicies[$index])) {
+            $this->employeePolicies[$index]['enrolled'] = !($this->employeePolicies[$index]['enrolled'] ?? false);
+        }
+    }
+
     public function removePolicy($index)
     {
-        unset($this->employeePolicies[$index]);
-        $this->employeePolicies = array_values($this->employeePolicies);
+        if (isset($this->employeePolicies[$index])) {
+            $this->employeePolicies[$index]['enrolled'] = false;
+        }
     }
 
     public function updatedSelectedEntityToAdd($value)
@@ -220,7 +244,7 @@ class Employees extends Component
             'employeeId', 'first_name', 'last_name', 'email', 'phone',
             'display_id', 'department_id', 'location_id', 'manager_id', 'base_pay',
             'managed_entities', 'selectedEntityToAdd', 'selectedPolicyToAdd',
-            'employeePolicies'
+            'employeePolicies', 'avatarFile', 'currentAvatarUrl', 'assigned_jobs', 'assigned_tasks', 'job_shifts'
         ]);
 
         $this->password = 'password';
@@ -229,6 +253,19 @@ class Employees extends Component
         $this->color = '#ffa526';
         $this->managed_team_type = 'restricted';
         $this->activeTab = 'details';
+
+        $allPolicies = TimeOffPolicy::where('active', true)->orderBy('name')->get();
+        $this->employeePolicies = [];
+        foreach ($allPolicies as $policy) {
+            $this->employeePolicies[] = [
+                'policy_id'       => $policy->id,
+                'name'            => $policy->name,
+                'type_label'      => $policy->policyTypeLabel(),
+                'enrolled'        => false,
+                'hire_date'       => now()->format('Y-m-d'),
+                'hours_remaining' => 0.00,
+            ];
+        }
 
         $this->applyRoleDefaults();
         $this->modalMode = 'add';
@@ -240,10 +277,13 @@ class Employees extends Component
         $this->resetValidation();
         $user = User::with('assignedPolicies')->findOrFail($id);
 
-        $this->employeeId    = $user->id;
-        $this->first_name    = $user->first_name ?? '';
-        $this->last_name     = $user->last_name ?? '';
-        $this->email         = $user->email;
+        $this->employeeId       = $user->id;
+        $this->avatarFile       = null;
+        $this->currentAvatarUrl = $user->avatar_url;
+        $nameParts              = explode(' ', $user->name ?? '', 2);
+        $this->first_name       = $user->first_name ?: ($nameParts[0] ?? '');
+        $this->last_name        = $user->last_name ?: ($nameParts[1] ?? 'Staff');
+        $this->email            = $user->email;
         $this->phone         = $user->phone ?? '';
         $this->display_id    = $user->display_id ?? '';
         $this->role          = $user->role ?? 'Employee';
@@ -257,13 +297,27 @@ class Employees extends Component
         $this->managed_team_type = $user->managed_team_type ?? 'restricted';
         $this->managed_entities  = $user->managed_employees ?? [];
 
+        $activeJobIds = Assignment::where('status', '!=', 'inactive')->pluck('id')->toArray();
+        $this->assigned_jobs  = array_values(array_intersect(array_map('intval', $user->permissions['assigned_jobs'] ?? []), $activeJobIds));
+
+        $activeTaskIds = Task::where('status', '!=', 'inactive')->pluck('id')->toArray();
+        $this->assigned_tasks = array_values(array_intersect(array_map('intval', $user->permissions['assigned_tasks'] ?? []), $activeTaskIds));
+        $this->job_shifts     = $user->permissions['job_shifts'] ?? [];
+
+        $allPolicies = TimeOffPolicy::where('active', true)->orderBy('name')->get();
+        $enrolledMap = $user->assignedPolicies->keyBy('id');
         $this->employeePolicies = [];
-        foreach ($user->assignedPolicies as $policy) {
+        foreach ($allPolicies as $policy) {
+            $assigned = $enrolledMap->get($policy->id);
             $this->employeePolicies[] = [
                 'policy_id'       => $policy->id,
                 'name'            => $policy->name,
-                'hire_date'       => $policy->pivot->hire_date ? \Carbon\Carbon::parse($policy->pivot->hire_date)->format('Y-m-d') : null,
-                'hours_remaining' => (float) $policy->pivot->hours_remaining,
+                'type_label'      => $policy->policyTypeLabel(),
+                'enrolled'        => (bool) $assigned,
+                'hire_date'       => $assigned && $assigned->pivot->hire_date
+                    ? \Carbon\Carbon::parse($assigned->pivot->hire_date)->format('Y-m-d')
+                    : ($user->created_at ? $user->created_at->format('Y-m-d') : now()->format('Y-m-d')),
+                'hours_remaining' => $assigned ? (float) $assigned->pivot->hours_remaining : 0.00,
             ];
         }
 
@@ -290,15 +344,25 @@ class Employees extends Component
 
     public function save()
     {
+        if (!auth()->user()->canAccessAdmin()) {
+            abort(403, 'Unauthorized.');
+        }
+
         $this->validate([
             'first_name' => 'required|string|max:100',
             'last_name'  => 'required|string|max:100',
             'email'      => ['required', 'email', Rule::unique('users', 'email')->ignore($this->employeeId)],
-            'role'       => 'required|in:Administrator,HR Manager,Manager,Employee',
+            'role'       => 'required|string|max:50|not_in:Super Admin',
             'status'     => 'required|in:Active,Inactive',
             'base_pay'   => 'nullable|numeric|min:0',
             'manager_id' => 'nullable|exists:users,id',
         ]);
+
+        $permissions = $this->permissions;
+        $permissions['assigned_jobs'] = array_values(array_unique(array_filter(array_map('intval', $this->assigned_jobs))));
+        $permissions['assigned_tasks'] = array_values(array_unique(array_filter(array_map('intval', $this->assigned_tasks))));
+        $permissions['job_shifts'] = $this->job_shifts;
+        $this->permissions = $permissions;
 
         $data = [
             'first_name'          => trim($this->first_name),
@@ -314,11 +378,19 @@ class Employees extends Component
             'department_id'       => $this->department_id ?: null,
             'location_id'         => $this->location_id ?: null,
             'manager_id'          => $this->manager_id ?: null,
-            'permissions'         => $this->permissions,
+            'permissions'         => $permissions,
             'managed_team_type'   => $this->managed_team_type,
             'managed_employees'   => $this->managed_entities,
             'manager_permissions' => $this->manager_permissions,
         ];
+
+        if ($this->avatarFile) {
+            $this->validate([
+                'avatarFile' => 'nullable|image|max:5120',
+            ]);
+            $path = $this->avatarFile->store('avatars', 'public');
+            $data['avatar'] = $path;
+        }
 
         if (!$this->employeeId) {
             $data['password'] = Hash::make($this->password ?: 'password');
@@ -330,26 +402,137 @@ class Employees extends Component
 
         $syncData = [];
         foreach ($this->employeePolicies as $policy) {
-            $syncData[$policy['policy_id']] = [
-                'hire_date'       => $policy['hire_date'] ?: null,
-                'hours_remaining' => $policy['hours_remaining'] ?? 0.00,
-            ];
+            $isEnrolled = isset($policy['enrolled']) ? (bool)$policy['enrolled'] : true;
+            if ($isEnrolled) {
+                $syncData[$policy['policy_id']] = [
+                    'hire_date'       => $policy['hire_date'] ?: null,
+                    'hours_remaining' => (float)($policy['hours_remaining'] ?? 0.00),
+                ];
+            }
         }
         $user->assignedPolicies()->sync($syncData);
 
-        session()->flash('message', $this->employeeId ? 'Employee updated successfully.' : 'Employee created successfully.');
+        $msg = $this->employeeId ? 'Employee updated successfully.' : 'Employee created successfully.';
+        session()->flash('message', $msg);
+        $this->dispatch('toast', message: $msg, type: 'success');
         $this->closeModal();
+    }
+
+    public function removeAvatar()
+    {
+        $this->avatarFile = null;
+        $this->currentAvatarUrl = null;
+        if ($this->employeeId) {
+            $u = User::find($this->employeeId);
+            if ($u) {
+                $u->avatar = null;
+                $u->save();
+            }
+        }
     }
 
     public function delete($id)
     {
-        User::findOrFail($id)->delete();
-        session()->flash('message', 'Employee removed.');
+        if (!auth()->user()->canAccessAdmin()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $user = User::findOrFail($id);
+
+        if ($user->isSuperAdmin()) {
+            session()->flash('error', 'Super Admin accounts cannot be deleted.');
+            $this->dispatch('toast', message: 'Super Admin accounts cannot be deleted.', type: 'error');
+            return;
+        }
+
+        // Strong RDBMS Check: if employee has child records, prevent hard deletion and mark Inactive instead
+        $hasTimeLogs      = \App\Models\TimeLog::where('employee_id', $id)->exists();
+        $hasSchedules     = \App\Models\Schedule::where('employee_id', $id)->exists();
+        $hasAssignments   = \App\Models\Assignment::where('employee_id', $id)->exists();
+        $hasDirectReports = User::where('manager_id', $id)->exists();
+
+        if ($hasTimeLogs || $hasSchedules || $hasAssignments || $hasDirectReports) {
+            if (auth()->user()?->canHardDelete()) {
+                \App\Services\InactiveRecordsHubService::permanentlyDeleteRecord('employees', $id);
+                $msg = "Employee '{$user->name}' and all linked child records permanently deleted.";
+                session()->flash('message', $msg);
+                $this->dispatch('toast', message: $msg, type: 'info');
+                return;
+            }
+
+            $user->update(['status' => 'Inactive']);
+            $msg = "Employee '{$user->name}' has existing child records (timesheets, schedules, or team assignments) and cannot be deleted. Marked as Inactive instead to preserve database integrity.";
+            session()->flash('message', $msg);
+            $this->dispatch('toast', message: $msg, type: 'warning');
+            return;
+        }
+
+        $user->delete();
+        session()->flash('message', 'Employee removed successfully.');
+        $this->dispatch('toast', message: 'Employee removed successfully.', type: 'success');
+    }
+
+        public function restoreEmployee($id)
+    {
+        if (!auth()->user()?->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can restore deleted records.');
+        }
+
+        $user = User::findOrFail($id);
+        $user->update(['status' => 'Active']);
+
+        // Restore child time logs if archived
+        \App\Models\TimeLog::where('employee_id', $id)
+            ->where('is_archived', true)
+            ->update([
+                'is_archived' => false,
+                'archived_at' => null,
+                'archived_by' => null,
+            ]);
+
+        $this->dispatch('toast', message: "Employee '{$user->name}' and child records restored successfully.", type: 'success');
+    }
+
+    public function permanentlyDeleteEmployee($id)
+    {
+        if (!auth()->user()?->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can permanently delete records.');
+        }
+
+        $user = User::findOrFail($id);
+        if ($user->isSuperAdmin()) {
+            $this->dispatch('toast', message: 'Super Admin accounts cannot be permanently deleted.', type: 'error');
+            return;
+        }
+
+        $name = $user->name;
+
+        // Cascade delete all child records
+        \App\Models\TimeLogAttachment::where('user_id', $id)->delete();
+        \App\Models\TimeLogNote::where('user_id', $id)->delete();
+        \App\Models\TimeLog::where('employee_id', $id)->delete();
+        \App\Models\Schedule::where('employee_id', $id)->delete();
+        \App\Models\TimeOffRequestThread::where('user_id', $id)->delete();
+        \App\Models\TimeOffRequest::where('employee_id', $id)->delete();
+        \App\Models\TimeOffPolicyEmployee::where('employee_id', $id)->delete();
+
+        User::where('manager_id', $id)->update(['manager_id' => null]);
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tbl_assignments', 'employee_id')) {
+            \App\Models\Assignment::where('employee_id', $id)->update(['employee_id' => null]);
+        }
+
+        $user->delete();
+
+        $this->dispatch('toast', message: "Employee '{$name}' and all linked child records permanently deleted.", type: 'info');
     }
 
     public function render()
     {
         $employees = User::query()
+            ->notSuperAdmin()
+            ->when(!$this->includeDeleted && empty($this->status_filter), function ($q) {
+                $q->whereNotIn('status', ['Inactive', 'inactive', 'deleted']);
+            })
             ->when($this->search, function ($query) {
                 $term = '%' . trim($this->search) . '%';
                 $query->where(function ($q) use ($term) {
@@ -367,10 +550,10 @@ class Employees extends Component
 
         return view('livewire.employees', [
             'employees'         => $employees,
-            'allEmployees'      => User::where('id', '!=', $this->employeeId)->orderBy('name')->get(),
-            'departments'       => Department::orderBy('name')->get(),
-            'locations'         => Location::orderBy('name')->get(),
-            'eligibleManagers'  => User::where('id', '!=', $this->employeeId)
+            'allEmployees'      => User::notSuperAdmin()->where('id', '!=', $this->employeeId)->orderBy('name')->get(),
+            'departments'       => Department::whereNotIn('status', ['Inactive', 'inactive'])->orderBy('name')->get(),
+            'locations'         => Location::whereNotIn('status', ['Inactive', 'inactive'])->orderBy('name')->get(),
+            'eligibleManagers'  => User::notSuperAdmin()->where('id', '!=', $this->employeeId)
                 ->whereIn('role', ['Administrator', 'HR Manager', 'Manager'])
                 ->where('status', 'Active')
                 ->orderBy('name')
@@ -379,6 +562,12 @@ class Employees extends Component
                 ->whereNotIn('id', $enrolledIds)
                 ->orderBy('name')
                 ->get(),
+            'availableRoles'    => \App\Models\Role::where('status', 'Active')
+                ->where('name', '!=', 'Super Admin')
+                ->orderBy('name')
+                ->get(),
+            'availableJobs'     => \App\Models\Assignment::where('status', '!=', 'inactive')->ongoing()->orderBy('name')->get(),
+            'availableTasks'    => \App\Models\Task::where('status', '!=', 'inactive')->ongoing()->orderBy('name')->get(),
         ])->layout('layouts.app');
     }
 }
