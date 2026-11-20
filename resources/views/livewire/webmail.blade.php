@@ -43,13 +43,9 @@
         </div>
     </div>
 
-    {{-- Toast Message --}}
+    {{-- Toast Message (Dispatched to Global Bootstrap Alert Container) --}}
     @if($toastMessage)
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-             class="p-3 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs {{ $toastType === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
-            <span>{{ $toastType === 'success' ? '✓' : '⚠️' }} {{ $toastMessage }}</span>
-            <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold text-sm">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js($toastMessage), @js($toastType ?? 'success'))" class="hidden"></div>
     @endif
 
     {{-- Main Webmail Layout: Sidebar + List --}}
@@ -403,28 +399,38 @@
                     </div>
 
                     @if($settingsTestMessage)
-                        <div class="p-3 rounded-lg text-xs font-semibold {{ $settingsTestStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
-                            {{ $settingsTestMessage }}
-                        </div>
+                        <div x-data x-init="window.showToast(@js($settingsTestMessage), @js($settingsTestStatus === 'success' ? 'success' : 'danger'))" class="hidden"></div>
                     @endif
 
                     @if($useCustomEmail)
                         {{-- SMTP Section --}}
                         <div class="border border-sky-100 bg-sky-50/30 rounded-xl p-4 space-y-3">
-                            <div class="flex items-center justify-between border-b border-sky-100 pb-2">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sky-100 pb-2">
                                 <span class="font-bold text-sky-900 flex items-center gap-1.5">
                                     <i class="fa-solid fa-paper-plane text-sky-600"></i> Outgoing Mail (SMTP)
                                 </span>
-                                <button type="button" wire:click="testSmtpSettings"
-                                        class="px-2.5 py-1 bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 rounded text-[11px] font-bold shadow-2xs">
-                                    Test SMTP Connection
-                                </button>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[10px] font-bold text-gray-500 uppercase">Presets:</span>
+                                    <button type="button" wire:click="applyPreset('hostinger')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition shadow-2xs">
+                                        🟣 Hostinger
+                                    </button>
+                                    <button type="button" wire:click="applyPreset('gmail')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition shadow-2xs">
+                                        🔴 Gmail
+                                    </button>
+                                    <button type="button" wire:click="applyPreset('office365')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition shadow-2xs">
+                                        🔵 Microsoft 365
+                                    </button>
+                                    <button type="button" wire:click="testSmtpSettings"
+                                            class="px-2.5 py-1 bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 rounded text-[11px] font-bold shadow-2xs">
+                                        Test SMTP
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div class="sm:col-span-2">
                                     <label class="block font-semibold text-gray-700 mb-1">SMTP Host</label>
-                                    <input type="text" wire:model="smtpHost" placeholder="smtp.gmail.com" class="w-full p-2 border rounded text-xs bg-white">
+                                    <input type="text" wire:model="smtpHost" placeholder="smtp.hostinger.com" class="w-full p-2 border rounded text-xs bg-white">
                                 </div>
                                 <div>
                                     <label class="block font-semibold text-gray-700 mb-1">Port</label>

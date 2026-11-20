@@ -215,7 +215,15 @@ class EmailService
      */
     public static function testSmtpConnection(array $config): array
     {
-        $host = trim($config['host'] ?? '');
+        $rawHost = trim($config['host'] ?? '');
+        $host = $rawHost;
+        $autocorrectNote = '';
+
+        if (preg_match('/^(stmp|smpt)\./i', $host)) {
+            $host = preg_replace('/^(stmp|smpt)\./i', 'smtp.', $host);
+            $autocorrectNote = " (Auto-corrected host from '{$rawHost}' to '{$host}')";
+        }
+
         $port = (int) ($config['port'] ?? 587);
         $username = trim($config['username'] ?? '');
         $password = $config['password'] ?? '';
@@ -254,9 +262,15 @@ class EmailService
             );
 
             if (!$fp) {
+                $typoTip = '';
+                if (preg_match('/^(stmp|smpt)\./i', $rawHost)) {
+                    $typoTip = " Tip: '{$rawHost}' contains a typo ('stmp' instead of 'smtp').";
+                } elseif (str_contains($errstr, 'getaddrinfo') || str_contains($errstr, 'Name or service not known')) {
+                    $typoTip = " Tip: Host '{$host}' could not be resolved via DNS. Check spelling.";
+                }
                 return [
                     'success' => false,
-                    'message' => "Could not connect to SMTP server {$host}:{$port} - Error: {$errstr} ({$errno}). Check if host/port is correct and firewall allows outgoing SMTP."
+                    'message' => "Could not connect to SMTP server {$host}:{$port} - Error: {$errstr} ({$errno}).{$typoTip} Check if host/port is correct and firewall allows outgoing SMTP."
                 ];
             }
 
@@ -296,7 +310,7 @@ class EmailService
 
             return [
                 'success' => true,
-                'message' => "SMTP connection & authentication verified successfully for {$username}@{$host}:{$port}!"
+                'message' => "SMTP connection & authentication verified successfully for {$username}@{$host}:{$port}!{$autocorrectNote}"
             ];
         } catch (Throwable $e) {
             $errMsg = $e->getMessage();
@@ -318,7 +332,14 @@ class EmailService
      */
     public static function testImapConnection(array $config): array
     {
-        $host = trim($config['host'] ?? '');
+        $rawHost = trim($config['host'] ?? '');
+        $host = $rawHost;
+        $autocorrectNote = '';
+
+        if (preg_match('/^(ipam|impa|imap1)\./i', $host)) {
+            $host = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', $host);
+            $autocorrectNote = " (Auto-corrected host from '{$rawHost}' to '{$host}')";
+        }
         $port = (int) ($config['port'] ?? 993);
         $username = trim($config['username'] ?? '');
         $password = $config['password'] ?? '';

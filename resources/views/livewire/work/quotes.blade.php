@@ -17,19 +17,11 @@
     </div>
 
     @if (session()->has('message'))
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-             class="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 text-sm rounded shadow-sm flex items-center justify-between">
-            <span>{{ session('message') }}</span>
-            <button type="button" @click="show = false" class="text-green-600 hover:text-green-800 font-bold ml-2 leading-none text-base">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js(session('message')), 'success')" class="hidden"></div>
     @endif
 
     @if (session()->has('error'))
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-             class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 text-sm rounded shadow-sm flex items-center justify-between">
-            <span>{{ session('error') }}</span>
-            <button type="button" @click="show = false" class="text-red-600 hover:text-red-800 font-bold ml-2 leading-none text-base">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js(session('error')), 'danger')" class="hidden"></div>
     @endif
 
     {{-- Filter Bar --}}

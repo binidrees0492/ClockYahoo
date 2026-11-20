@@ -89,8 +89,39 @@ class Webmail extends Component
         $this->showSettings = false;
     }
 
+    public function applyPreset(string $provider): void
+    {
+        if ($provider === 'hostinger') {
+            $this->smtpHost       = 'smtp.hostinger.com';
+            $this->smtpPort       = 465;
+            $this->smtpEncryption = 'ssl';
+            $this->imapHost       = 'imap.hostinger.com';
+            $this->imapPort       = 993;
+            $this->imapEncryption = 'ssl';
+            $this->dispatch('toast', message: 'Hostinger presets loaded.', type: 'info');
+        } elseif ($provider === 'gmail') {
+            $this->smtpHost       = 'smtp.gmail.com';
+            $this->smtpPort       = 587;
+            $this->smtpEncryption = 'tls';
+            $this->imapHost       = 'imap.gmail.com';
+            $this->imapPort       = 993;
+            $this->imapEncryption = 'ssl';
+            $this->dispatch('toast', message: 'Gmail presets loaded.', type: 'info');
+        } elseif ($provider === 'office365') {
+            $this->smtpHost       = 'smtp.office365.com';
+            $this->smtpPort       = 587;
+            $this->smtpEncryption = 'tls';
+            $this->imapHost       = 'outlook.office365.com';
+            $this->imapPort       = 993;
+            $this->imapEncryption = 'ssl';
+            $this->dispatch('toast', message: 'Office 365 presets loaded.', type: 'info');
+        }
+    }
+
     public function testSmtpSettings()
     {
+        $this->smtpHost = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim((string) $this->smtpHost));
+
         $res = EmailService::testSmtpConnection([
             'host'       => $this->smtpHost,
             'port'       => (int) $this->smtpPort,
@@ -101,10 +132,13 @@ class Webmail extends Component
 
         $this->settingsTestStatus = $res['success'] ? 'success' : 'error';
         $this->settingsTestMessage = 'SMTP: ' . $res['message'];
+        $this->dispatch('toast', message: $this->settingsTestMessage, type: $res['success'] ? 'success' : 'error');
     }
 
     public function testImapSettings()
     {
+        $this->imapHost = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim((string) $this->imapHost));
+
         $res = EmailService::testImapConnection([
             'host'       => $this->imapHost,
             'port'       => (int) $this->imapPort,
@@ -115,10 +149,14 @@ class Webmail extends Component
 
         $this->settingsTestStatus = $res['success'] ? 'success' : 'error';
         $this->settingsTestMessage = 'IMAP: ' . $res['message'];
+        $this->dispatch('toast', message: $this->settingsTestMessage, type: $res['success'] ? 'success' : 'error');
     }
 
     public function saveMailboxSettings()
     {
+        $this->smtpHost = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim((string) $this->smtpHost));
+        $this->imapHost = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim((string) $this->imapHost));
+
         $this->validate([
             'smtpPort'        => 'nullable|numeric|between:1,65535',
             'smtpFromAddress' => 'nullable|email',
@@ -145,6 +183,7 @@ class Webmail extends Component
 
         $this->toastMessage = 'Webmail mailbox settings saved successfully.';
         $this->toastType = 'success';
+        $this->dispatch('toast', message: $this->toastMessage, type: 'success');
         $this->showSettings = false;
     }
 

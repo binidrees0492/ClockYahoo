@@ -79,8 +79,39 @@ class PersonalConfigs extends Component
         $this->imap_password     = $user->imap_password ?: '';
     }
 
+    public function applyPreset(string $provider): void
+    {
+        if ($provider === 'hostinger') {
+            $this->smtp_host       = 'smtp.hostinger.com';
+            $this->smtp_port       = 465;
+            $this->smtp_encryption = 'ssl';
+            $this->imap_host       = 'imap.hostinger.com';
+            $this->imap_port       = 993;
+            $this->imap_encryption = 'ssl';
+            $this->dispatch('toast', message: 'Hostinger presets applied! Enter your Hostinger email address as username.', type: 'info');
+        } elseif ($provider === 'gmail') {
+            $this->smtp_host       = 'smtp.gmail.com';
+            $this->smtp_port       = 587;
+            $this->smtp_encryption = 'tls';
+            $this->imap_host       = 'imap.gmail.com';
+            $this->imap_port       = 993;
+            $this->imap_encryption = 'ssl';
+            $this->dispatch('toast', message: 'Gmail presets applied! Use a 16-character App Password.', type: 'info');
+        } elseif ($provider === 'office365') {
+            $this->smtp_host       = 'smtp.office365.com';
+            $this->smtp_port       = 587;
+            $this->smtp_encryption = 'tls';
+            $this->imap_host       = 'outlook.office365.com';
+            $this->imap_port       = 993;
+            $this->imap_encryption = 'ssl';
+            $this->dispatch('toast', message: 'Office 365 presets applied.', type: 'info');
+        }
+    }
+
     public function testAndValidateSmtp()
     {
+        $this->smtp_host = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim($this->smtp_host));
+
         $this->validate([
             'smtp_host'       => 'required|string|max:255',
             'smtp_port'       => 'required|integer|min:1|max:65535',
@@ -99,10 +130,13 @@ class PersonalConfigs extends Component
 
         $this->validationStatus = $result['success'] ? 'success' : 'error';
         $this->validationMessage = 'SMTP Validation: ' . $result['message'];
+        $this->dispatch('toast', message: $this->validationMessage, type: $result['success'] ? 'success' : 'error');
     }
 
     public function testAndValidateImap()
     {
+        $this->imap_host = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim($this->imap_host));
+
         $this->validate([
             'imap_host'       => 'required|string|max:255',
             'imap_port'       => 'required|integer|min:1|max:65535',
@@ -121,6 +155,7 @@ class PersonalConfigs extends Component
 
         $this->validationStatus = $result['success'] ? 'success' : 'error';
         $this->validationMessage = 'IMAP Validation: ' . $result['message'];
+        $this->dispatch('toast', message: $this->validationMessage, type: $result['success'] ? 'success' : 'error');
     }
 
     public function saveTheme()
@@ -147,6 +182,9 @@ class PersonalConfigs extends Component
 
     public function saveEmail()
     {
+        $this->smtp_host = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim($this->smtp_host));
+        $this->imap_host = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim($this->imap_host));
+
         $this->validate([
             'smtp_port'         => 'nullable|integer|min:1|max:65535',
             'imap_port'         => 'nullable|integer|min:1|max:65535',
@@ -171,6 +209,7 @@ class PersonalConfigs extends Component
 
         $this->toastMessage = 'Email and mailbox credentials saved successfully.';
         $this->toastType = 'success';
+        $this->dispatch('toast', message: $this->toastMessage, type: 'success');
         $this->dispatch('form-saved');
     }
 
@@ -179,10 +218,14 @@ class PersonalConfigs extends Component
         Auth::user()->webAuthnCredentials()->where('id', $id)->delete();
         $this->toastMessage = 'Passkey removed.';
         $this->toastType = 'success';
+        $this->dispatch('toast', message: $this->toastMessage, type: 'success');
     }
 
     public function save()
     {
+        $this->smtp_host = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim($this->smtp_host));
+        $this->imap_host = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim($this->imap_host));
+
         $this->validate([
             'timezone'                        => 'required|string|max:100',
             'theme_preference'                => 'required|in:light,dark,gradient,sage dark green',
@@ -217,6 +260,7 @@ class PersonalConfigs extends Component
 
         $this->toastMessage = 'Personal configurations, email settings & theme saved successfully.';
         $this->toastType = 'success';
+        $this->dispatch('toast', message: $this->toastMessage, type: 'success');
         $this->dispatch('form-saved');
     }
 

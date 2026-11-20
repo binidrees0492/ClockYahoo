@@ -10,11 +10,7 @@
     </div>
 
     @if (session()->has('message'))
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-             class="mb-4 p-3 bg-green-100 border border-green-200 text-green-800 text-sm rounded shadow-sm flex items-center justify-between">
-            <span>{{ session('message') }}</span>
-            <button type="button" @click="show = false" class="text-green-800 font-bold ml-2 leading-none text-base">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js(session('message')), 'success')" class="hidden"></div>
     @endif
 
     {{-- Filter Bar --}}

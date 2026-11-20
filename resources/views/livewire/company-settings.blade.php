@@ -18,16 +18,9 @@
         </div>
     </div>
 
-    {{-- Toast Notification --}}
+    {{-- Toast Notification (Dispatched to Global Bootstrap Alert Container) --}}
     @if($toastMessage)
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-sm transition {{ $toastType === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200' }}">
-            <div class="flex items-center gap-2">
-                <span>{{ $toastType === 'error' ? '⚠️' : '✓' }}</span>
-                <span>{{ $toastMessage }}</span>
-            </div>
-            <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold text-base leading-none">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js($toastMessage), @js($toastType ?? 'success'))" class="hidden"></div>
     @endif
 
     {{-- Nav Tabs --}}
@@ -68,16 +61,9 @@
         @endif
     </div>
 
-    {{-- Connection Test Result Banner --}}
+    {{-- Connection Test Result Banner (Dispatched to Global Bootstrap Alert Container) --}}
     @if($testMessage)
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 7000)" x-transition
-             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm {{ $testStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200' }}">
-            <div class="flex items-center gap-2">
-                <span class="text-base">{{ $testStatus === 'success' ? '🚀' : '❌' }}</span>
-                <span>{{ $testMessage }}</span>
-            </div>
-            <button wire:click="$set('testMessage', null)" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js($testMessage), @js($testStatus === 'success' ? 'success' : 'danger'))" class="hidden"></div>
     @endif
 
     {{-- TAB 1: General & Geofencing --}}
@@ -909,11 +895,25 @@
                         </div>
 
                         <div class="space-y-4">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700">Employee SMTP Outgoing Settings</h3>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700">Employee SMTP Outgoing Settings</h3>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[10px] font-bold text-gray-500 uppercase">Presets:</span>
+                                    <button type="button" wire:click="applyEmployeePreset('hostinger')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition shadow-xs">
+                                        🟣 Hostinger
+                                    </button>
+                                    <button type="button" wire:click="applyEmployeePreset('gmail')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition shadow-xs">
+                                        🔴 Gmail
+                                    </button>
+                                    <button type="button" wire:click="applyEmployeePreset('office365')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition shadow-xs">
+                                        🔵 Microsoft 365
+                                    </button>
+                                </div>
+                            </div>
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                     <label class="text-[11px] font-bold text-gray-600 block">Host</label>
-                                    <input type="text" wire:model="empSmtpHost" class="w-full border rounded p-1.5 text-xs">
+                                    <input type="text" wire:model="empSmtpHost" placeholder="smtp.hostinger.com" class="w-full border rounded p-1.5 text-xs">
                                 </div>
                                 <div>
                                     <label class="text-[11px] font-bold text-gray-600 block">Port</label>

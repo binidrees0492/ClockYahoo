@@ -28,16 +28,9 @@
         </div>
     </div>
 
-    {{-- Flash Message / Last Results --}}
+    {{-- Flash Message / Last Results (Dispatched to Global Bootstrap Alert Container) --}}
     @if(session()->has('message'))
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-             class="p-4 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm font-semibold flex items-center justify-between shadow-xs">
-            <div class="flex items-center gap-2">
-                <i class="fa-solid fa-circle-check text-emerald-600 text-lg"></i>
-                <span>{{ session('message') }}</span>
-            </div>
-            <button type="button" @click="show = false" class="text-emerald-700 hover:text-emerald-900 font-bold ml-3 text-base leading-none">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js(session('message')), 'success')" class="hidden"></div>
     @endif
 
     @if($lastResults)

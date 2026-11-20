@@ -305,4 +305,47 @@ class CompanySettingsAndEmailTest extends TestCase
         $this->assertTrue(CompanySetting::isPageActive('map'));
         $this->assertTrue(CompanySetting::isPageActive('reports'));
     }
+
+    public function test_employee_smtp_preset_and_typo_autocorrection(): void
+    {
+        $admin = User::factory()->create([
+            'role'   => 'Administrator',
+            'status' => 'Active',
+        ]);
+
+        $employee = User::factory()->create([
+            'name'   => 'Hostinger User',
+            'email'  => 'info@sunrises.online',
+            'role'   => 'Employee',
+            'status' => 'Active',
+        ]);
+
+        $this->actingAs($admin);
+
+        // Test Hostinger preset button
+        Livewire::test(CompanySettings::class)
+            ->call('selectEmployee', $employee->id)
+            ->call('applyEmployeePreset', 'hostinger')
+            ->assertSet('empSmtpHost', 'smtp.hostinger.com')
+            ->assertSet('empSmtpPort', 465)
+            ->assertSet('empSmtpEncryption', 'ssl')
+            ->assertSet('empImapHost', 'imap.hostinger.com')
+            ->assertSet('empImapPort', 993)
+            ->assertSet('empImapEncryption', 'ssl');
+
+        // Test typo autocorrection (stmp -> smtp) when saving
+        Livewire::test(CompanySettings::class)
+            ->call('selectEmployee', $employee->id)
+            ->set('empUseCustomEmail', true)
+            ->set('empSmtpHost', 'stmp.hostinger.com') // intentionally mis-typed "stmp"
+            ->set('empSmtpPort', 465)
+            ->set('empSmtpEncryption', 'ssl')
+            ->set('empSmtpUsername', 'info@sunrises.online')
+            ->call('saveEmployeeEmail')
+            ->assertHasNoErrors();
+
+        $employee->refresh();
+        $this->assertEquals('smtp.hostinger.com', $employee->smtp_host);
+    }
 }
+

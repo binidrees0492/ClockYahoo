@@ -1,23 +1,11 @@
 <section class="space-y-6">
-    {{-- Toast notification --}}
+    {{-- Toast and Validation Notifications (Dispatched to Global Bootstrap Alert Container) --}}
     @if($toastMessage)
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-             class="p-3 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs {{ $toastType === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
-            <span>{{ $toastType === 'success' ? '✓' : '⚠️' }} {{ $toastMessage }}</span>
-            <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js($toastMessage), @js($toastType ?? 'success'))" class="hidden"></div>
     @endif
 
-    {{-- Live Validation Result Banner --}}
     @if($validationMessage)
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)" x-transition
-             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-xs {{ $validationStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200' }}">
-            <div class="flex items-center gap-2">
-                <span>{{ $validationStatus === 'success' ? '🚀' : '❌' }}</span>
-                <span>{{ $validationMessage }}</span>
-            </div>
-            <button wire:click="$set('validationMessage', null)" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
-        </div>
+        <div x-data x-init="window.showToast(@js($validationMessage), @js($validationStatus === 'success' ? 'success' : 'danger'))" class="hidden"></div>
     @endif
 
     {{-- TAB CONTENT: THEME & REGIONAL --}}
@@ -267,14 +255,28 @@
             @if($use_custom_email)
                 {{-- SMTP OUTGOING SETTINGS --}}
                 <div class="bg-gray-50/70 border border-gray-200 rounded-xl p-4 space-y-4">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200 pb-2">
                         <h4 class="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
                             <i class="fa-solid fa-paper-plane text-sky-600"></i> Outgoing Mail Server (SMTP)
                         </h4>
-                        <button type="button" wire:click="testAndValidateSmtp"
-                                class="px-3 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded text-xs font-bold transition inline-flex items-center gap-1">
-                            <i class="fa-solid fa-bolt"></i> Test & Validate SMTP
-                        </button>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <div class="flex items-center gap-1">
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Presets:</span>
+                                <button type="button" wire:click="applyPreset('hostinger')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition shadow-xs">
+                                    🟣 Hostinger
+                                </button>
+                                <button type="button" wire:click="applyPreset('gmail')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition shadow-xs">
+                                    🔴 Gmail
+                                </button>
+                                <button type="button" wire:click="applyPreset('office365')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition shadow-xs">
+                                    🔵 Microsoft 365
+                                </button>
+                            </div>
+                            <button type="button" wire:click="testAndValidateSmtp"
+                                    class="px-2.5 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded text-xs font-bold transition inline-flex items-center gap-1">
+                                <i class="fa-solid fa-bolt"></i> Test SMTP
+                            </button>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">

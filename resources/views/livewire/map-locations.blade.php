@@ -5,13 +5,9 @@
             <p class="text-sm text-gray-500">You do not have permission to view or manage GPS map tracking presets.</p>
         </div>
     @else
-        {{-- Toast Alert --}}
+        {{-- Toast Alert (Dispatched to Global Bootstrap Alert Container) --}}
         @if($toastMessage)
-            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-                 class="flex items-center justify-between p-3 rounded-lg text-xs font-semibold {{ $toastType === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200' }}">
-                <span>{{ $toastMessage }}</span>
-                <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-600 font-bold ml-2">&times;</button>
-            </div>
+            <div x-data x-init="window.showToast(@js($toastMessage), @js($toastType ?? 'success'))" class="hidden"></div>
         @endif
 
         {{-- Top Header --}}

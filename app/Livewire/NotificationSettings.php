@@ -214,16 +214,14 @@ class NotificationSettings extends Component
             }
         }
 
-        $this->toastMessage = 'Notification routing rules successfully updated.';
-        $this->toastType = 'success';
+        $this->setToast('Notification routing rules successfully updated.', 'success');
     }
 
     public function saveEmailSettings()
     {
         $user = Auth::user();
         if (!$user->canAccessAdmin()) {
-            $this->toastMessage = 'Only administrators can update email server sender configuration.';
-            $this->toastType = 'error';
+            $this->setToast('Only administrators can update email server sender configuration.', 'error');
             return;
         }
 
@@ -238,8 +236,7 @@ class NotificationSettings extends Component
         CompanySetting::set('notification_reply_to', trim($this->notificationReplyTo));
         CompanySetting::set('notification_email_enabled', (bool) $this->notificationEmailEnabled);
 
-        $this->toastMessage = 'Notification sender email settings saved successfully.';
-        $this->toastType = 'success';
+        $this->setToast('Notification sender email settings saved successfully.', 'success');
     }
 
     public function sendTestEmail()
@@ -252,11 +249,9 @@ class NotificationSettings extends Component
         $this->testEmailResult = $res;
 
         if ($res['success']) {
-            $this->toastMessage = $res['message'];
-            $this->toastType = 'success';
+            $this->setToast($res['message'], 'success');
         } else {
-            $this->toastMessage = $res['message'];
-            $this->toastType = 'error';
+            $this->setToast($res['message'], 'error');
         }
     }
 
@@ -279,8 +274,7 @@ class NotificationSettings extends Component
             ]);
         }
 
-        $this->toastMessage = 'Manager employee activity notification preferences saved.';
-        $this->toastType = 'success';
+        $this->setToast('Manager employee activity notification preferences saved.', 'success');
     }
 
     public function togglePersonalGlobalChannel($channel)
@@ -323,8 +317,7 @@ class NotificationSettings extends Component
         foreach ($this->personalEvents as $key => $val) {
             $this->personalEvents[$key] = ['in_app' => true, 'toast' => true, 'email' => true];
         }
-        $this->toastMessage = 'All notification channels and alert types enabled for your account.';
-        $this->toastType = 'success';
+        $this->setToast('All notification channels and alert types enabled for your account.', 'success');
     }
 
     public function muteAllPersonalNotifications()
@@ -334,8 +327,7 @@ class NotificationSettings extends Component
         foreach ($this->personalEvents as $key => $val) {
             $this->personalEvents[$key] = ['in_app' => false, 'toast' => false, 'email' => false];
         }
-        $this->toastMessage = 'All personal notifications muted for your account.';
-        $this->toastType = 'info';
+        $this->setToast('All personal notifications muted for your account.', 'info');
     }
 
     public function restoreDefaultPersonalPreferences()
@@ -346,8 +338,7 @@ class NotificationSettings extends Component
             'detailed_notification_settings'  => null,
         ]);
         $this->loadPersonalPreferences();
-        $this->toastMessage = 'Personal notification preferences restored to system defaults.';
-        $this->toastType = 'success';
+        $this->setToast('Personal notification preferences restored to system defaults.', 'success');
     }
 
     public function savePersonalPreferences()
@@ -362,16 +353,14 @@ class NotificationSettings extends Component
             ],
         ]);
 
-        $this->toastMessage = 'Your personal notification preferences have been saved successfully.';
-        $this->toastType = 'success';
+        $this->setToast('Your personal notification preferences have been saved successfully.', 'success');
     }
 
     public function resetDefaultRules()
     {
         $user = Auth::user();
         if (!$user->canAccessAdmin()) {
-            $this->toastMessage = 'Unauthorized.';
-            $this->toastType = 'error';
+            $this->setToast('Unauthorized.', 'error');
             return;
         }
 
@@ -386,8 +375,14 @@ class NotificationSettings extends Component
         }
 
         $this->loadRules();
-        $this->toastMessage = 'Notification rules restored to default policy.';
-        $this->toastType = 'success';
+        $this->setToast('Notification rules restored to default policy.', 'success');
+    }
+
+    public function setToast($message, $type = 'success')
+    {
+        $this->toastMessage = $message;
+        $this->toastType = $type;
+        $this->dispatch('toast', message: $message, type: $type);
     }
 
     public function dismissToast()

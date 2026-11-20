@@ -132,11 +132,7 @@
             </div>
 
             @if (session()->has('message'))
-                <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
-                     class="mb-4 p-4 text-sm text-green-700 bg-green-100 rounded-lg flex items-center justify-between">
-                    <span>{{ session('message') }}</span>
-                    <button type="button" @click="show = false" class="text-green-800 hover:text-green-950 font-bold ml-2 leading-none text-base">&times;</button>
-                </div>
+                <div x-data x-init="window.showToast(@js(session('message')), 'success')" class="hidden"></div>
             @endif
 
             <div class="space-y-6 max-w-2xl">

@@ -366,6 +366,9 @@ class CompanySettings extends Component
 
     public function testServerSmtp()
     {
+        $this->mailHost = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim($this->mailHost));
+        $this->imapHost = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim($this->imapHost));
+
         $result = EmailService::testSmtpConnection([
             'host'       => $this->mailHost,
             'port'       => $this->mailPort,
@@ -376,10 +379,13 @@ class CompanySettings extends Component
 
         $this->testStatus = $result['success'] ? 'success' : 'error';
         $this->testMessage = 'SMTP: ' . $result['message'];
+        $this->dispatch('toast', message: $this->testMessage, type: $result['success'] ? 'success' : 'error');
     }
 
     public function testServerImap()
     {
+        $this->imapHost = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim($this->imapHost));
+
         $result = EmailService::testImapConnection([
             'host'       => $this->imapHost,
             'port'       => $this->imapPort,
@@ -390,6 +396,7 @@ class CompanySettings extends Component
 
         $this->testStatus = $result['success'] ? 'success' : 'error';
         $this->testMessage = 'IMAP: ' . $result['message'];
+        $this->dispatch('toast', message: $this->testMessage, type: $result['success'] ? 'success' : 'error');
     }
 
     public function selectEmployee($employeeId)
@@ -416,11 +423,43 @@ class CompanySettings extends Component
         $this->testMessage = null;
     }
 
+    public function applyEmployeePreset(string $provider): void
+    {
+        if ($provider === 'hostinger') {
+            $this->empSmtpHost       = 'smtp.hostinger.com';
+            $this->empSmtpPort       = 465;
+            $this->empSmtpEncryption = 'ssl';
+            $this->empImapHost       = 'imap.hostinger.com';
+            $this->empImapPort       = 993;
+            $this->empImapEncryption = 'ssl';
+            $this->showToast('Hostinger presets applied to employee settings.');
+        } elseif ($provider === 'gmail') {
+            $this->empSmtpHost       = 'smtp.gmail.com';
+            $this->empSmtpPort       = 587;
+            $this->empSmtpEncryption = 'tls';
+            $this->empImapHost       = 'imap.gmail.com';
+            $this->empImapPort       = 993;
+            $this->empImapEncryption = 'ssl';
+            $this->showToast('Gmail presets applied to employee settings.');
+        } elseif ($provider === 'office365') {
+            $this->empSmtpHost       = 'smtp.office365.com';
+            $this->empSmtpPort       = 587;
+            $this->empSmtpEncryption = 'tls';
+            $this->empImapHost       = 'outlook.office365.com';
+            $this->empImapPort       = 993;
+            $this->empImapEncryption = 'ssl';
+            $this->showToast('Microsoft 365 presets applied to employee settings.');
+        }
+    }
+
     public function saveEmployeeEmail()
     {
         if (!$this->selectedEmployeeId) return;
 
         $employee = User::findOrFail($this->selectedEmployeeId);
+
+        $this->empSmtpHost = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim($this->empSmtpHost));
+        $this->empImapHost = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim($this->empImapHost));
 
         $employee->update([
             'use_custom_email'  => $this->empUseCustomEmail,
@@ -443,6 +482,8 @@ class CompanySettings extends Component
 
     public function testEmployeeSmtp()
     {
+        $this->empSmtpHost = preg_replace('/^(stmp|smpt)\./i', 'smtp.', trim($this->empSmtpHost));
+
         $result = EmailService::testSmtpConnection([
             'host'       => $this->empSmtpHost,
             'port'       => $this->empSmtpPort,
@@ -453,10 +494,13 @@ class CompanySettings extends Component
 
         $this->testStatus = $result['success'] ? 'success' : 'error';
         $this->testMessage = "Employee SMTP: " . $result['message'];
+        $this->dispatch('toast', message: $this->testMessage, type: $result['success'] ? 'success' : 'error');
     }
 
     public function testEmployeeImap()
     {
+        $this->empImapHost = preg_replace('/^(ipam|impa|imap1)\./i', 'imap.', trim($this->empImapHost));
+
         $result = EmailService::testImapConnection([
             'host'       => $this->empImapHost,
             'port'       => $this->empImapPort,
@@ -467,6 +511,7 @@ class CompanySettings extends Component
 
         $this->testStatus = $result['success'] ? 'success' : 'error';
         $this->testMessage = "Employee IMAP: " . $result['message'];
+        $this->dispatch('toast', message: $this->testMessage, type: $result['success'] ? 'success' : 'error');
     }
 
     public function resendEmail($logId)
@@ -495,6 +540,7 @@ class CompanySettings extends Component
     {
         $this->toastMessage = $message;
         $this->toastType = $type;
+        $this->dispatch('toast', message: $message, type: $type);
     }
 
     public function dismissToast()
