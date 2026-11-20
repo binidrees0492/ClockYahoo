@@ -317,6 +317,7 @@ class NotificationRoutingService
         $content .= "Best regards,\n{$sender['name']}";
 
         try {
+            \App\Services\EmailService::applyRuntimeMailConfig();
             Mail::raw($content, function ($message) use ($recipientEmail, $recipientName, $fullSubject, $sender) {
                 $message->to($recipientEmail, $recipientName)
                     ->subject($fullSubject)

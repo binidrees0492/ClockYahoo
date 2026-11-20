@@ -1,20 +1,22 @@
 <section class="space-y-6">
     {{-- Toast notification --}}
     @if($toastMessage)
-        <div class="p-3 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs {{ $toastType === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
+             class="p-3 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs {{ $toastType === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
             <span>{{ $toastType === 'success' ? '✓' : '⚠️' }} {{ $toastMessage }}</span>
-            <button wire:click="dismissToast" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
+            <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
         </div>
     @endif
 
     {{-- Live Validation Result Banner --}}
     @if($validationMessage)
-        <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-xs {{ $validationStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200' }}">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)" x-transition
+             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-xs {{ $validationStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200' }}">
             <div class="flex items-center gap-2">
                 <span>{{ $validationStatus === 'success' ? '🚀' : '❌' }}</span>
                 <span>{{ $validationMessage }}</span>
             </div>
-            <button wire:click="$set('validationMessage', null)" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
+            <button wire:click="$set('validationMessage', null)" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
         </div>
     @endif
 

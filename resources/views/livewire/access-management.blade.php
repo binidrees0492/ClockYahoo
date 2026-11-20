@@ -18,12 +18,13 @@
 
     {{-- Toast Notification --}}
     @if($toastMessage)
-        <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs transition {{ $toastType === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200' }}">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
+             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs transition {{ $toastType === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200' }}">
             <div class="flex items-center gap-2">
                 <span>{{ $toastType === 'error' ? '⚠️' : '✓' }}</span>
                 <span>{{ $toastMessage }}</span>
             </div>
-            <button wire:click="dismissToast" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
+            <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
         </div>
     @endif
 

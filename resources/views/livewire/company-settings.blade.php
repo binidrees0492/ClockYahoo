@@ -20,12 +20,13 @@
 
     {{-- Toast Notification --}}
     @if($toastMessage)
-        <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-sm transition {{ $toastType === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200' }}">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
+             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-sm transition {{ $toastType === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200' }}">
             <div class="flex items-center gap-2">
                 <span>{{ $toastType === 'error' ? '⚠️' : '✓' }}</span>
                 <span>{{ $toastMessage }}</span>
             </div>
-            <button wire:click="dismissToast" class="text-gray-400 hover:text-gray-700 font-bold text-base leading-none">&times;</button>
+            <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold text-base leading-none">&times;</button>
         </div>
     @endif
 
@@ -69,12 +70,13 @@
 
     {{-- Connection Test Result Banner --}}
     @if($testMessage)
-        <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm {{ $testStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200' }}">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 7000)" x-transition
+             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm {{ $testStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200' }}">
             <div class="flex items-center gap-2">
                 <span class="text-base">{{ $testStatus === 'success' ? '🚀' : '❌' }}</span>
                 <span>{{ $testMessage }}</span>
             </div>
-            <button wire:click="$set('testMessage', null)" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
+            <button wire:click="$set('testMessage', null)" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold">&times;</button>
         </div>
     @endif
 
@@ -716,6 +718,43 @@
                 <div>
                     <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800">Default Server SMTP Settings</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Used for system notifications, password resets, timesheet approvals, and general outgoing emails.</p>
+                </div>
+
+                {{-- Quick Presets --}}
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-blue-50/70 border border-blue-200 rounded-xl p-3.5">
+                    <div>
+                        <h4 class="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                            <span>⚡</span> Quick Provider Presets
+                        </h4>
+                        <p class="text-[11px] text-blue-700 mt-0.5">Autofill recommended host, port, and encryption settings with a single click.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" wire:click="applyPreset('hostinger')"
+                                class="px-3 py-1.5 bg-[#673de6] hover:bg-[#5229cf] text-white rounded-lg text-xs font-bold shadow-xs transition inline-flex items-center gap-1.5">
+                            <span>🟣</span> Hostinger (Port 465 SSL)
+                        </button>
+                        <button type="button" wire:click="applyPreset('gmail')"
+                                class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 rounded-lg text-xs font-bold shadow-xs transition inline-flex items-center gap-1.5">
+                            <span>🔴</span> Gmail (587 TLS)
+                        </button>
+                        <button type="button" wire:click="applyPreset('office365')"
+                                class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 rounded-lg text-xs font-bold shadow-xs transition inline-flex items-center gap-1.5">
+                            <span>🔵</span> Microsoft 365
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Hostinger Setup Tip --}}
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2.5">
+                    <span class="text-base shrink-0">💡</span>
+                    <div>
+                        <span class="font-bold">Hostinger Email Guidelines:</span>
+                        <div class="mt-0.5 text-[11px] text-amber-800 space-y-0.5">
+                            <div>&bull; <strong>Host:</strong> <code class="bg-amber-100 px-1 rounded">smtp.hostinger.com</code> &bull; <strong>Port:</strong> <code class="bg-amber-100 px-1 rounded">465</code> &bull; <strong>Encryption:</strong> <code class="bg-amber-100 px-1 rounded">SSL</code></div>
+                            <div>&bull; <strong>Username:</strong> Must be your full email account (e.g. <code class="bg-amber-100 px-1 rounded">user@yourdomain.com</code>), not just the username prefix.</div>
+                            <div>&bull; <strong>Sender "From" Address:</strong> Must match your Hostinger mailbox account to prevent rejection.</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

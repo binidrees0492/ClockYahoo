@@ -1,9 +1,10 @@
 <div>
     @if($toastMessage)
-        <div class="mb-4 px-4 py-2.5 rounded-lg text-sm shadow-sm flex justify-between items-center
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
+             class="mb-4 px-4 py-2.5 rounded-lg text-sm shadow-sm flex justify-between items-center
             {{ $toastType === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200' }}">
             <span>{{ $toastMessage }}</span>
-            <button wire:click="dismissToast" class="opacity-60 hover:opacity-100 font-bold">&times;</button>
+            <button wire:click="dismissToast" @click="show = false" class="opacity-60 hover:opacity-100 font-bold">&times;</button>
         </div>
     @endif
 

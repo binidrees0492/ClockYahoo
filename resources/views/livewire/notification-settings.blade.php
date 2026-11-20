@@ -31,12 +31,13 @@
 
     {{-- Toast Notification Banner --}}
     @if($toastMessage)
-        <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs transition {{ $toastType === 'error' ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200' }}">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-transition
+             class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs transition {{ $toastType === 'error' ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200' }}">
             <div class="flex items-center gap-2">
                 <span>{{ $toastType === 'error' ? '⚠️' : '✓' }}</span>
                 <span>{{ $toastMessage }}</span>
             </div>
-            <button wire:click="dismissToast" class="text-gray-400 hover:text-gray-700 font-bold text-base leading-none">&times;</button>
+            <button wire:click="dismissToast" @click="show = false" class="text-gray-400 hover:text-gray-700 font-bold text-base leading-none">&times;</button>
         </div>
     @endif
 
@@ -728,8 +729,10 @@
                 </div>
 
                 @if($testEmailResult)
-                    <div class="p-3 rounded-xl text-xs font-semibold {{ $testEmailResult['success'] ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
-                        {{ $testEmailResult['message'] }}
+                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 7000)" x-transition
+                         class="p-3 rounded-xl text-xs font-semibold flex items-center justify-between {{ $testEmailResult['success'] ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
+                        <span>{{ $testEmailResult['message'] }}</span>
+                        <button type="button" @click="show = false; $wire.set('testEmailResult', null)" class="text-gray-400 hover:text-gray-700 font-bold text-base ml-2">&times;</button>
                     </div>
                 @endif
             </div>

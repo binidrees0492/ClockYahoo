@@ -26,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
                 @date_default_timezone_set($appTz);
                 config(['app.timezone' => $appTz]);
             }
+            \App\Services\EmailService::applyRuntimeMailConfig();
         } catch (\Throwable $e) {
             // Graceful fallback during initial migrations or setup
         }

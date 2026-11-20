@@ -136,6 +136,78 @@ class EmailService
     }
 
     /**
+     * Dynamically apply SMTP credentials from CompanySetting or parameters to Laravel Mail runtime.
+     */
+    public static function applyRuntimeMailConfig(?array $customConfig = null): void
+    {
+        try {
+            $host = $customConfig['host'] ?? \App\Models\CompanySetting::get('mail_host');
+            if (empty($host)) {
+                return;
+            }
+
+            $port = (int) ($customConfig['port'] ?? \App\Models\CompanySetting::get('mail_port', 587));
+            $encryption = strtolower(trim((string) ($customConfig['encryption'] ?? \App\Models\CompanySetting::get('mail_encryption', 'tls'))));
+            $isSsl = ($encryption === 'ssl' || $port === 465);
+            $scheme = $isSsl ? 'smtps' : null;
+
+            $username = $customConfig['username'] ?? \App\Models\CompanySetting::get('mail_username');
+            $password = $customConfig['password'] ?? \App\Models\CompanySetting::get('mail_password');
+            $fromAddress = $customConfig['from_address'] ?? \App\Models\CompanySetting::get('mail_from_address') ?: config('mail.from.address');
+            $fromName = $customConfig['from_name'] ?? \App\Models\CompanySetting::get('mail_from_name') ?: config('mail.from.name');
+
+            config([
+                'mail.default' => 'smtp',
+                'mail.mailers.smtp.transport' => 'smtp',
+                'mail.mailers.smtp.host' => $host,
+                'mail.mailers.smtp.port' => $port,
+                'mail.mailers.smtp.encryption' => $encryption,
+                'mail.mailers.smtp.scheme' => $scheme,
+                'mail.mailers.smtp.username' => $username,
+                'mail.mailers.smtp.password' => $password,
+                'mail.from.address' => $fromAddress,
+                'mail.from.name' => $fromName,
+            ]);
+
+            app()->forgetInstance('mail.manager');
+            Mail::purge('smtp');
+        } catch (Throwable $e) {
+            Log::warning('EmailService: Failed applying runtime mail config: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Safely synchronize mail values into .env file if it exists and is writable.
+     */
+    public static function updateEnvFile(array $values): bool
+    {
+        $envPath = base_path('.env');
+        if (!file_exists($envPath) || !is_writable($envPath)) {
+            return false;
+        }
+
+        try {
+            $content = file_get_contents($envPath);
+            foreach ($values as $key => $val) {
+                $valStr = (string) $val;
+                if (preg_match('/\s/', $valStr) || str_contains($valStr, '#')) {
+                    $valStr = '"' . addcslashes($valStr, '"') . '"';
+                }
+                if (preg_match("/^{$key}=.*/m", $content)) {
+                    $content = preg_replace("/^{$key}=.*/m", "{$key}={$valStr}", $content);
+                } else {
+                    $content .= "\n{$key}={$valStr}";
+                }
+            }
+            file_put_contents($envPath, $content);
+            return true;
+        } catch (Throwable $e) {
+            Log::warning('EmailService: Failed updating .env file: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Test SMTP connection.
      *
      * @param array{host: string, port: int|string, username?: string, password?: string, encryption?: string} $config
@@ -158,24 +230,33 @@ class EmailService
         }
 
         try {
-            // First check socket reachability
-            $protocol = ($encryption === 'ssl') ? 'ssl://' : 'tcp://';
-            $timeout = 5;
+            $isSsl = ($encryption === 'ssl' || $port === 465);
+            $protocol = $isSsl ? 'ssl://' : 'tcp://';
+            $timeout = 8;
             $errno = 0;
             $errstr = '';
+
+            $context = stream_context_create([
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                ],
+            ]);
 
             $fp = @stream_socket_client(
                 $protocol . $host . ':' . $port,
                 $errno,
                 $errstr,
                 $timeout,
-                STREAM_CLIENT_CONNECT
+                STREAM_CLIENT_CONNECT,
+                $context
             );
 
             if (!$fp) {
                 return [
                     'success' => false,
-                    'message' => "Could not connect to SMTP server {$host}:{$port} - Error: {$errstr} ({$errno})"
+                    'message' => "Could not connect to SMTP server {$host}:{$port} - Error: {$errstr} ({$errno}). Check if host/port is correct and firewall allows outgoing SMTP."
                 ];
             }
 
@@ -202,7 +283,8 @@ class EmailService
             }
 
             // If credentials provided, attempt full transport authentication
-            $tls = in_array($encryption, ['tls', 'starttls']);
+            // In Symfony EsmtpTransport: $tls = true for implicit TLS (SMTPS on port 465/ssl), null for STARTTLS (port 587/tls)
+            $tls = $isSsl ? true : ($encryption === 'none' ? false : null);
             $transport = new EsmtpTransport($host, $port, $tls);
             if (!empty($username)) {
                 $transport->setUsername($username);
@@ -217,9 +299,13 @@ class EmailService
                 'message' => "SMTP connection & authentication verified successfully for {$username}@{$host}:{$port}!"
             ];
         } catch (Throwable $e) {
+            $errMsg = $e->getMessage();
+            if (str_contains(strtolower($errMsg), 'authentication failed') || str_contains(strtolower($errMsg), '535')) {
+                $errMsg .= " (Hostinger Tip: Use your full email address e.g. info@yourdomain.com as username, not just the prefix)";
+            }
             return [
                 'success' => false,
-                'message' => 'SMTP Connection test failed: ' . $e->getMessage()
+                'message' => 'SMTP Connection test failed: ' . $errMsg
             ];
         }
     }

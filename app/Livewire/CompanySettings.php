@@ -309,7 +309,59 @@ class CompanySettings extends Component
         CompanySetting::set('imap_username', $this->imapUsername);
         CompanySetting::set('imap_password', $this->imapPassword);
 
+        // Apply immediately to runtime and synchronize .env
+        EmailService::applyRuntimeMailConfig([
+            'host'         => $this->mailHost,
+            'port'         => $this->mailPort,
+            'encryption'   => $this->mailEncryption,
+            'username'     => $this->mailUsername,
+            'password'     => $this->mailPassword,
+            'from_address' => $this->mailFromAddress,
+            'from_name'    => $this->mailFromName,
+        ]);
+
+        EmailService::updateEnvFile([
+            'MAIL_MAILER'       => 'smtp',
+            'MAIL_HOST'         => $this->mailHost,
+            'MAIL_PORT'         => $this->mailPort,
+            'MAIL_ENCRYPTION'   => $this->mailEncryption,
+            'MAIL_SCHEME'       => ($this->mailEncryption === 'ssl' || (int) $this->mailPort === 465) ? 'smtps' : 'null',
+            'MAIL_USERNAME'     => $this->mailUsername ?: 'null',
+            'MAIL_PASSWORD'     => $this->mailPassword ?: 'null',
+            'MAIL_FROM_ADDRESS' => $this->mailFromAddress ?: 'hello@example.com',
+            'MAIL_FROM_NAME'    => $this->mailFromName ?: config('app.name'),
+        ]);
+
         $this->showToast('Default server email & IMAP settings saved successfully.');
+    }
+
+    public function applyPreset(string $provider): void
+    {
+        if ($provider === 'hostinger') {
+            $this->mailHost       = 'smtp.hostinger.com';
+            $this->mailPort       = 465;
+            $this->mailEncryption = 'ssl';
+            $this->imapHost       = 'imap.hostinger.com';
+            $this->imapPort       = 993;
+            $this->imapEncryption = 'ssl';
+            $this->showToast('Hostinger presets loaded! Please enter your Hostinger email address as username and From Address.');
+        } elseif ($provider === 'gmail') {
+            $this->mailHost       = 'smtp.gmail.com';
+            $this->mailPort       = 587;
+            $this->mailEncryption = 'tls';
+            $this->imapHost       = 'imap.gmail.com';
+            $this->imapPort       = 993;
+            $this->imapEncryption = 'ssl';
+            $this->showToast('Gmail presets loaded! Note: Gmail requires a 16-character App Password.');
+        } elseif ($provider === 'office365') {
+            $this->mailHost       = 'smtp.office365.com';
+            $this->mailPort       = 587;
+            $this->mailEncryption = 'tls';
+            $this->imapHost       = 'outlook.office365.com';
+            $this->imapPort       = 993;
+            $this->imapEncryption = 'ssl';
+            $this->showToast('Microsoft 365 presets loaded.');
+        }
     }
 
     public function testServerSmtp()
