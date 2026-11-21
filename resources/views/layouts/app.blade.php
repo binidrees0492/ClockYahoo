@@ -1851,82 +1851,9 @@
         </div>
     </div>
 
-    {{-- Global Bootstrap Alert Notifications (Fixed at top of z-index, floating above all elements without layout shifts) --}}
-    <div x-data="{
-             alerts: [],
-             add(msg, type = 'success') {
-                 if (!msg) return;
-                 let text = typeof msg === 'object' ? (msg.message || msg.text || msg.msg || '') : String(msg);
-                 if (!text || !text.trim()) return;
-                 let id = Date.now() + Math.random();
-                 let cleanType = ['success', 'error', 'danger', 'warning', 'info'].includes(type) ? type : 'info';
-                 if (cleanType === 'error') cleanType = 'danger';
-                 let duration = (text.length > 80 || text.includes('Error:') || text.includes('failed:')) ? 7500 : 4500;
-                 this.alerts.push({ id, msg: text.trim(), type: cleanType });
-                 setTimeout(() => {
-                     this.dismiss(id);
-                 }, duration);
-             },
-             dismiss(id) {
-                 this.alerts = this.alerts.filter(a => a.id !== id);
-             },
-             handleEvent(detail) {
-                 if (!detail) return;
-                 if (Array.isArray(detail)) detail = detail[0] || {};
-                 let text = typeof detail === 'object' ? (detail.message || detail.text || detail.msg || '') : String(detail);
-                 let type = (typeof detail === 'object' && detail.type) ? detail.type : 'info';
-                 this.add(text, type);
-             }
-         }"
-         @toast.window="handleEvent($event.detail)"
-         @notify.window="handleEvent($event.detail)"
-         @alert.window="handleEvent($event.detail)"
-         x-init="
-             window.showToast = (msg, type = 'success') => add(msg, type);
-             window.showAlert = (msg, type = 'success') => add(msg, type);
-             @if(session('message')) add(@js(session('message')), 'success'); @endif
-             @if(session('success')) add(@js(session('success')), 'success'); @endif
-             @if(session('error')) add(@js(session('error')), 'danger'); @endif
-             @if(session('status')) add(@js(session('status')), 'info'); @endif
-             @if(session('warning')) add(@js(session('warning')), 'warning'); @endif
-         "
-         class="fixed top-4 left-1/2 -translate-x-1/2 z-[99999] flex flex-col gap-2.5 pointer-events-none w-full max-w-xl px-4">
-        <template x-for="a in alerts" :key="a.id">
-            <div x-transition:enter="transition ease-out duration-300 transform"
-                 x-transition:enter-start="-translate-y-4 opacity-0 scale-95"
-                 x-transition:enter-end="translate-y-0 opacity-100 scale-100"
-                 x-transition:leave="transition ease-in duration-200 transform"
-                 x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-                 x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                 class="pointer-events-auto rounded-lg shadow-2xl px-4 py-3 text-sm font-medium border flex items-center justify-between gap-3 transition-all"
-                 :class="{
-                     'bg-[#d1e7dd] text-[#0f5132] border-[#badbcc]': a.type === 'success',
-                     'bg-[#f8d7da] text-[#842029] border-[#f5c2c7]': a.type === 'danger' || a.type === 'error',
-                     'bg-[#fff3cd] text-[#664d03] border-[#ffecb5]': a.type === 'warning',
-                     'bg-[#cff4fc] text-[#055160] border-[#b6effb]': a.type === 'info'
-                 }"
-                 role="alert">
-                <div class="flex items-center gap-2.5 min-w-0">
-                    <template x-if="a.type === 'success'">
-                        <i class="fa-solid fa-circle-check text-base text-[#0f5132] shrink-0"></i>
-                    </template>
-                    <template x-if="a.type === 'danger' || a.type === 'error'">
-                        <i class="fa-solid fa-circle-xmark text-base text-[#842029] shrink-0"></i>
-                    </template>
-                    <template x-if="a.type === 'warning'">
-                        <i class="fa-solid fa-triangle-exclamation text-base text-[#664d03] shrink-0"></i>
-                    </template>
-                    <template x-if="a.type === 'info'">
-                        <i class="fa-solid fa-circle-info text-base text-[#055160] shrink-0"></i>
-                    </template>
-                    <span class="break-words leading-snug" x-text="a.msg"></span>
-                </div>
-                <button type="button" @click="dismiss(a.id)"
-                        class="shrink-0 p-1 text-gray-500 hover:text-black transition opacity-60 hover:opacity-100 text-lg leading-none cursor-pointer"
-                        aria-label="Close" title="Dismiss">&times;</button>
-            </div>
-        </template>
-    </div>
+    {{-- Global Bootstrap Alert Notifications (Reusable Component fixed at Top-Right) --}}
+    <x-toast-alerts />
+
 
     {{-- Global Alert Modal Dialog (Transforms window.alert into beautiful modal with auto-dismiss fallback) --}}
     <div x-data="{
