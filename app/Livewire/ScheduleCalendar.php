@@ -60,6 +60,7 @@ class ScheduleCalendar extends Component
     // Property aliases matching ScheduleBoard for identical modal structure
     public $showAddShift = false;
     public $editingShiftId = null;
+    public $employeeSearch = '';
     public $shiftDateFrom = null;
     public $shiftDateTo = null;
     public $shiftStart = '08:00';
@@ -116,6 +117,23 @@ class ScheduleCalendar extends Component
         $this->selectedSchedule = null;
     }
 
+    public function toggleEmployeeSelection($id)
+    {
+        $id = (int)$id;
+        if ($this->editingScheduleId || $this->editingShiftId) {
+            $this->shiftEmployeeId = $id;
+            $this->shiftEmployeeIds = [$id];
+            return;
+        }
+
+        if (in_array($id, $this->shiftEmployeeIds, true)) {
+            $this->shiftEmployeeIds = array_values(array_diff($this->shiftEmployeeIds, [$id]));
+        } else {
+            $this->shiftEmployeeIds[] = $id;
+        }
+        $this->shiftEmployeeId = $this->shiftEmployeeIds[0] ?? null;
+    }
+
     public function selectAllEmployees()
     {
         $user = Auth::user();
@@ -124,8 +142,17 @@ class ScheduleCalendar extends Component
         if ($accessibleIds !== null) {
             $q->whereIn('id', $accessibleIds);
         }
-        $this->shiftEmployeeIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
-        if (!empty($this->shiftEmployeeIds)) {
+        if (!empty($this->employeeSearch)) {
+            $search = '%' . trim($this->employeeSearch) . '%';
+            $q->where(function ($sq) use ($search) {
+                $sq->where('name', 'like', $search)
+                   ->orWhere('email', 'like', $search)
+                   ->orWhere('role', 'like', $search);
+            });
+        }
+        $newIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        $this->shiftEmployeeIds = array_values(array_unique(array_merge($this->shiftEmployeeIds, $newIds)));
+        if (!empty($this->shiftEmployeeIds) && !$this->shiftEmployeeId) {
             $this->shiftEmployeeId = $this->shiftEmployeeIds[0];
         }
     }
@@ -139,6 +166,9 @@ class ScheduleCalendar extends Component
     public function selectAllJobs()
     {
         $this->shiftAssignmentIds = Assignment::where('status', '!=', 'inactive')->ongoing()->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        if (count($this->shiftAssignmentIds) === 1) {
+            $this->shiftAssignmentId = $this->shiftAssignmentIds[0];
+        }
     }
 
     public function clearJobs()
@@ -155,7 +185,23 @@ class ScheduleCalendar extends Component
         if (!empty($this->shiftAssignmentIds)) {
             $q->whereIn('assignment_id', $this->shiftAssignmentIds);
         }
-        $this->shiftTaskIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        $taskIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        $this->shiftTaskIds = $taskIds;
+
+        // Auto-select parent jobs of these child tasks
+        $parentJobIds = Task::whereIn('id', $taskIds)
+            ->whereNotNull('assignment_id')
+            ->pluck('assignment_id')
+            ->map(fn($id) => (int)$id)
+            ->unique()
+            ->toArray();
+        $this->shiftAssignmentIds = array_values(array_unique(array_merge($this->shiftAssignmentIds, $parentJobIds)));
+        if (count($this->shiftAssignmentIds) === 1) {
+            $this->shiftAssignmentId = $this->shiftAssignmentIds[0];
+        }
+        if (count($taskIds) === 1) {
+            $this->shiftTaskId = $taskIds[0];
+        }
     }
 
     public function clearTasks()
@@ -166,6 +212,7 @@ class ScheduleCalendar extends Component
 
     public function toggleJobTasks($jobId)
     {
+        $jobId = (int)$jobId;
         $jobTaskIds = Task::where('assignment_id', $jobId)
             ->where('status', '!=', 'inactive')
             ->ongoing()
@@ -178,6 +225,11 @@ class ScheduleCalendar extends Component
             $this->shiftTaskIds = array_values(array_diff($this->shiftTaskIds, $jobTaskIds));
         } else {
             $this->shiftTaskIds = array_values(array_unique(array_merge($this->shiftTaskIds, $jobTaskIds)));
+            // Interdependent: Ensure the parent job is selected
+            if (!in_array($jobId, $this->shiftAssignmentIds, true)) {
+                $this->shiftAssignmentIds[] = $jobId;
+            }
+            $this->shiftAssignmentId = $jobId;
         }
     }
 
@@ -192,6 +244,7 @@ class ScheduleCalendar extends Component
         $targetDate = $date ?: Carbon::now()->toDateString();
         $this->editingScheduleId = null;
         $this->editingShiftId = null;
+        $this->employeeSearch = '';
 
         $initialEmpId = $employeeId ?: ($this->selectedEmployeeId && $this->selectedEmployeeId !== 'all' ? $this->selectedEmployeeId : Auth::id());
         $this->shiftEmployeeId   = $initialEmpId;
@@ -294,9 +347,15 @@ class ScheduleCalendar extends Component
 
     public function updatedShiftAssignmentId($value)
     {
-        $this->shiftTaskId = null;
         if ($value) {
             $this->shiftAssignmentIds = [(int)$value];
+            if ($this->shiftTaskId) {
+                $task = Task::find($this->shiftTaskId);
+                if (!$task || $task->assignment_id != $value) {
+                    $this->shiftTaskId = null;
+                    $this->shiftTaskIds = [];
+                }
+            }
             $job = Assignment::find($value);
             if ($job) {
                 if ($job->location_id) {
@@ -319,8 +378,37 @@ class ScheduleCalendar extends Component
                     ]);
                 }
             }
+        } else {
+            $this->shiftTaskId = null;
+            $this->shiftTaskIds = [];
         }
     }
+
+    public function updatedShiftAssignmentIds($values)
+    {
+        $selectedJobIds = array_map('intval', (array)$values);
+        $this->shiftAssignmentIds = $selectedJobIds;
+        if (!empty($selectedJobIds)) {
+            // Keep only child tasks belonging to the selected parent jobs
+            $validTaskIds = Task::whereIn('assignment_id', $selectedJobIds)
+                ->pluck('id')
+                ->map(fn($id) => (int)$id)
+                ->toArray();
+            $this->shiftTaskIds = array_values(array_intersect(array_map('intval', $this->shiftTaskIds), $validTaskIds));
+            if ($this->shiftTaskId && !in_array((int)$this->shiftTaskId, $validTaskIds, true)) {
+                $this->shiftTaskId = null;
+            }
+            if (count($selectedJobIds) === 1) {
+                $this->shiftAssignmentId = $selectedJobIds[0];
+            }
+        } else {
+            $this->shiftTaskIds = [];
+            $this->shiftTaskId = null;
+            $this->shiftAssignmentId = null;
+        }
+    }
+
+
 
     public function updatedShiftTaskId($value)
     {
@@ -369,6 +457,7 @@ class ScheduleCalendar extends Component
 
         $this->editingScheduleId = $s->id;
         $this->editingShiftId    = $s->id;
+        $this->employeeSearch    = '';
         $this->shiftEmployeeId   = $s->employee_id;
         $this->shiftEmployeeIds  = [(int)$s->employee_id];
         $this->shiftAssignmentId = $s->assignment_id;
@@ -469,7 +558,7 @@ class ScheduleCalendar extends Component
             'editingScheduleId', 'editingShiftId', 'shiftEmployeeId', 'shiftEmployeeIds', 'shiftAssignmentId', 'shiftAssignmentIds',
             'shiftTaskId', 'shiftTaskIds', 'shiftNotes', 'latitude', 'longitude', 'locationName', 'locationPresetId',
             'shiftLatitude', 'shiftLongitude', 'shiftLocationName', 'shiftLocationPresetId',
-            'shiftDaysBreakdown', 'shiftBreakdownWeekPage', 'selectedShiftDays',
+            'shiftDaysBreakdown', 'shiftBreakdownWeekPage', 'selectedShiftDays', 'employeeSearch',
         ]);
         $today = Carbon::now()->toDateString();
         $this->shiftDate           = $today;
@@ -1204,6 +1293,16 @@ class ScheduleCalendar extends Component
         }
         $employees = $employeesQuery->get();
 
+        $modalEmployees = $employees;
+        if (!empty($this->employeeSearch)) {
+            $search = strtolower(trim($this->employeeSearch));
+            $modalEmployees = $modalEmployees->filter(function ($e) use ($search) {
+                return str_contains(strtolower($e->name), $search)
+                    || str_contains(strtolower($e->email ?? ''), $search)
+                    || str_contains(strtolower($e->role ?? ''), $search);
+            });
+        }
+
         $targetEmpId = $this->isMySchedule ? $user->id : $this->selectedEmployeeId;
 
         // Schedules query
@@ -1250,6 +1349,7 @@ class ScheduleCalendar extends Component
             'timeLogs'          => $timeLogs,
             'todayKey'          => Carbon::now()->toDateString(),
             'employees'         => $employees,
+            'modalEmployees'    => $modalEmployees,
             'locationPresets'   => \App\Models\Location::where('status', '!=', 'inactive')->orderBy('name')->get(),
             'assignments'       => Assignment::ongoing()->orderBy('name')->get(),
             'tasks'             => Task::ongoing()->orderBy('name')->get(),

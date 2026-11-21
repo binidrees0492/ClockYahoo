@@ -409,14 +409,14 @@
         </div>
     </div>
 
-    {{-- ADD / EDIT SHIFT MODAL --}}
+    {{-- ADD / EDIT SHIFT MODAL (Three-Column Layout: Left Sidebar Employees, Center Shift Details & Child-Parent Job/Task, Rightmost Location & Map) --}}
     @if($showAddShift)
         @php
             $isMultiDay = !$editingShiftId && count($this->shiftDaysBreakdown) > 1;
         @endphp
         @teleport('body')
         <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-3 sm:p-4 overflow-y-auto">
-            <div class="bg-white rounded-xl shadow-xl w-full {{ $isMultiDay ? 'max-w-6xl' : 'max-w-2xl' }} p-5 sm:p-6 max-h-[92vh] overflow-hidden flex flex-col my-auto transition-all duration-200">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-7xl p-5 sm:p-6 max-h-[94vh] overflow-hidden flex flex-col my-auto transition-all duration-200">
                 <div class="flex items-center justify-between pb-3 border-b border-gray-200 mb-4">
                     <div class="flex items-center gap-2">
                         <h3 class="text-lg font-bold text-gray-900">
@@ -429,71 +429,111 @@
                     <button wire:click="cancelShift" class="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none">&times;</button>
                 </div>
 
-                <div class="grid grid-cols-1 {{ $isMultiDay ? 'lg:grid-cols-12' : '' }} gap-5 overflow-y-auto flex-1 pr-1 text-xs">
-                    {{-- Left Column: Shift Details & Location (col-span-5 if multi-day, full width if single day) --}}
-                    <div class="{{ $isMultiDay ? 'lg:col-span-5' : '' }} space-y-3">
-                        {{-- Employee Selection (Multi-select for new shifts, single for edit) --}}
-                        <div>
-                            @if($editingShiftId)
-                                <label class="text-xs font-semibold text-gray-700 block mb-1">Employee*</label>
-                                <select wire:model="shiftEmployeeId" class="w-full border rounded p-2 text-xs bg-white">
-                                    <option value="">Select Employee</option>
-                                    @foreach($employees as $e)
-                                        <option value="{{ $e->id }}">{{ $e->name }}</option>
-                                    @endforeach
-                                </select>
-                            @else
-                                <div class="flex items-center justify-between mb-1">
-                                    <label class="text-xs font-semibold text-gray-700">Assigned Employees* ({{ count($shiftEmployeeIds) }} selected)</label>
-                                    <div class="flex items-center gap-2 text-[10px]">
-                                        <button type="button" wire:click="selectAllEmployees" class="text-cs-blue hover:underline font-semibold">Select All</button>
-                                        <span class="text-gray-300">|</span>
-                                        <button type="button" wire:click="clearEmployees" class="text-gray-500 hover:underline">Clear</button>
-                                    </div>
-                                </div>
-                                <div class="max-h-28 overflow-y-auto border border-gray-300 rounded p-1.5 space-y-1 bg-white">
-                                    @foreach($employees as $e)
-                                        <label class="flex items-center gap-2 px-1.5 py-0.5 rounded hover:bg-blue-50 cursor-pointer text-xs">
-                                            <input type="checkbox" wire:model.live="shiftEmployeeIds" value="{{ $e->id }}" class="rounded text-[#005a9c]">
-                                            <span class="text-gray-800 font-medium">{{ $e->name }}</span>
-                                            <span class="text-[10px] text-gray-400">({{ $e->role }})</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            @endif
-                            @error('shiftEmployeeIds') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
-                            @error('shiftEmployeeId') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
+                {{-- THREE-COLUMN LAYOUT --}}
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-y-auto flex-1 pr-1 text-xs">
+                    
+                    {{-- COLUMN 1 (LEFT SIDEBAR): ASSIGNED EMPLOYEES (SEARCH & SELECT) --}}
+                    <div class="lg:col-span-3 flex flex-col border border-gray-200 bg-slate-50/70 rounded-xl p-3 max-h-[72vh] overflow-hidden">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-200">
+                            <span class="font-bold text-gray-800 text-xs flex items-center gap-1.5">
+                                <span>👥</span> Assigned Employees
+                            </span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-[#005a9c]">
+                                {{ count($shiftEmployeeIds) }} selected
+                            </span>
                         </div>
 
-                        {{-- Job & Task (Multi-select for new shifts, single for edit) --}}
-                        @if($editingShiftId)
-                            <div>
-                                <label class="text-xs font-semibold text-gray-700 block mb-1">Job (Active/Ongoing)*</label>
-                                <select wire:model="shiftAssignmentId" class="w-full border rounded p-2 text-xs bg-white">
-                                    <option value="">— Select Ongoing Job —</option>
-                                    @foreach($assignableJobs as $j)
-                                        <option value="{{ $j->id }}">{{ $j->name }} ({{ ucfirst($j->status) }})</option>
-                                    @endforeach
-                                </select>
-                                @error('shiftAssignmentId') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
-                            </div>
+                        {{-- Search Employees Input --}}
+                        <div class="relative mb-2">
+                            <input type="text"
+                                   wire:model.live.debounce.150ms="employeeSearch"
+                                   placeholder="🔍 Search employees..."
+                                   class="w-full border border-gray-300 rounded-lg pl-2.5 pr-7 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            @if($employeeSearch)
+                                <button type="button"
+                                        wire:click="$set('employeeSearch', '')"
+                                        class="absolute right-2 top-1.5 text-gray-400 hover:text-gray-700 text-sm font-bold leading-none">&times;</button>
+                            @endif
+                        </div>
 
-                            <div>
-                                <label class="text-xs font-semibold text-gray-700 block mb-1">Task (Active/Ongoing)*</label>
-                                <select wire:model.live="shiftTaskId" class="w-full border rounded p-2 text-xs bg-white">
-                                    <option value="">— Select Ongoing Task —</option>
-                                    @foreach($assignableTasks as $t)
-                                        <option value="{{ $t->id }}">{{ $t->name }} ({{ ucfirst($t->status) }})</option>
-                                    @endforeach
-                                </select>
-                                @error('shiftTaskId') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
+                        {{-- Quick Actions --}}
+                        @if(!$editingShiftId)
+                            <div class="flex items-center justify-between mb-2 px-1 text-[10px]">
+                                <button type="button" wire:click="selectAllEmployees" class="text-cs-blue hover:underline font-semibold">Select All</button>
+                                <span class="text-gray-300">|</span>
+                                <button type="button" wire:click="clearEmployees" class="text-gray-500 hover:underline">Clear Selection</button>
+                            </div>
+                        @endif
+
+                        {{-- Scrollable Employees List --}}
+                        <div class="overflow-y-auto flex-1 space-y-1 pr-1">
+                            @forelse($modalEmployees as $e)
+                                @php
+                                    $isSelected = in_array((int)$e->id, array_map('intval', $shiftEmployeeIds), true) || ($editingShiftId && (int)$shiftEmployeeId === (int)$e->id);
+                                @endphp
+                                <div wire:click="toggleEmployeeSelection({{ $e->id }})"
+                                     class="flex items-center gap-2 p-1.5 rounded-lg border cursor-pointer transition select-none {{ $isSelected ? 'bg-blue-50/90 border-blue-300 shadow-2xs' : 'bg-white border-gray-200 hover:bg-gray-100/70' }}">
+                                    <input type="{{ $editingShiftId ? 'radio' : 'checkbox' }}"
+                                           wire:model.live="{{ $editingShiftId ? 'shiftEmployeeId' : 'shiftEmployeeIds' }}"
+                                           value="{{ $e->id }}"
+                                           class="rounded text-[#005a9c] shrink-0"
+                                           @click.stop>
+                                    <div class="w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
+                                        {{ $e->initials }}
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-medium text-gray-900 truncate leading-tight">{{ $e->name }}</div>
+                                        <div class="text-[10px] text-gray-400 truncate">{{ $e->role }}</div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="text-center py-6 text-gray-400 italic">No employees found.</div>
+                            @endforelse
+                        </div>
+
+                        @error('shiftEmployeeIds') <p class="text-red-500 text-[10px] mt-1">{{ $message }}</p> @enderror
+                        @error('shiftEmployeeId') <p class="text-red-500 text-[10px] mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- COLUMN 2 (CENTER): SHIFT DETAILS & CHILD-PARENT JOB/TASK --}}
+                    <div class="lg:col-span-5 space-y-3 overflow-y-auto max-h-[72vh] pr-1">
+                        
+                        {{-- Child-Parent Job & Task Selection --}}
+                        @if($editingShiftId)
+                            <div class="space-y-2 border border-gray-200 bg-gray-50/50 rounded-xl p-3">
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-700 block mb-1">🏢 Parent Job (Active/Ongoing)*</label>
+                                    <select wire:model.live="shiftAssignmentId" class="w-full border rounded p-2 text-xs bg-white">
+                                        <option value="">— Select Ongoing Job —</option>
+                                        @foreach($assignableJobs as $j)
+                                            <option value="{{ $j->id }}">{{ $j->name }} ({{ ucfirst($j->status) }})</option>
+                                        @endforeach
+                                    </select>
+                                    @error('shiftAssignmentId') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
+                                </div>
+
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-700 block mb-1">📋 Child Task (Associated Sub-task)*</label>
+                                    @php
+                                        $filteredTasks = $shiftAssignmentId ? $assignableTasks->where('assignment_id', $shiftAssignmentId) : $assignableTasks;
+                                    @endphp
+                                    <select wire:model.live="shiftTaskId" class="w-full border rounded p-2 text-xs bg-white">
+                                        <option value="">{{ $shiftAssignmentId ? '— Select Child Task —' : '— Select Ongoing Task (Auto-sets Job) —' }}</option>
+                                        @foreach($filteredTasks as $t)
+                                            <option value="{{ $t->id }}">
+                                                {{ $t->name }} {{ $t->assignment ? '('.$t->assignment->name.')' : '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('shiftTaskId') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
+                                </div>
                             </div>
                         @else
-                            <div class="space-y-2">
-                                {{-- Multi-Jobs Selector --}}
+                            <div class="space-y-2 border border-gray-200 bg-gray-50/50 rounded-xl p-3">
+                                {{-- Parent Jobs Selector --}}
                                 <div>
                                     <div class="flex items-center justify-between mb-1">
-                                        <label class="text-xs font-semibold text-gray-700">Jobs* ({{ count($shiftAssignmentIds) }} selected)</label>
+                                        <label class="text-xs font-semibold text-gray-700">🏢 Parent Jobs* ({{ count($shiftAssignmentIds) }} selected)</label>
                                         <div class="flex items-center gap-2 text-[10px]">
                                             <button type="button" wire:click="selectAllJobs" class="text-cs-blue hover:underline font-semibold">Select All</button>
                                             <span class="text-gray-300">|</span>
@@ -512,10 +552,10 @@
                                     @error('shiftAssignmentId') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
                                 </div>
 
-                                {{-- Multi-Tasks Grouped by Selected Jobs --}}
+                                {{-- Child Tasks Grouped by Selected Parent Jobs --}}
                                 <div>
                                     <div class="flex items-center justify-between mb-1">
-                                        <label class="text-xs font-semibold text-gray-700">Tasks* ({{ count($shiftTaskIds) }} selected)</label>
+                                        <label class="text-xs font-semibold text-gray-700">📋 Child Tasks* ({{ count($shiftTaskIds) }} selected)</label>
                                         @if(count($shiftAssignmentIds) > 0)
                                             <div class="flex items-center gap-2 text-[10px]">
                                                 <button type="button" wire:click="selectAllTasks" class="text-cs-blue hover:underline font-semibold">Select All Tasks</button>
@@ -529,7 +569,7 @@
                                         $relevantJobs = count($shiftAssignmentIds) > 0 ? $assignableJobs->whereIn('id', $shiftAssignmentIds) : $assignableJobs;
                                     @endphp
 
-                                    <div class="max-h-32 overflow-y-auto border border-gray-300 rounded p-1.5 space-y-2 bg-white">
+                                    <div class="max-h-28 overflow-y-auto border border-gray-300 rounded p-1.5 space-y-2 bg-white">
                                         @forelse($relevantJobs as $job)
                                             @php
                                                 $jobTasks = $assignableTasks->where('assignment_id', $job->id);
@@ -549,11 +589,11 @@
                                                         <span class="text-gray-700 truncate">{{ $t->name }}</span>
                                                     </label>
                                                 @empty
-                                                    <div class="text-[10px] text-gray-400 italic px-2">No sub-tasks configured for this job</div>
+                                                    <div class="text-[10px] text-gray-400 italic px-2">No child tasks configured for this job</div>
                                                 @endforelse
                                             </div>
                                         @empty
-                                            <div class="text-gray-400 text-center py-2 text-[11px]">Select a job above to view and assign tasks</div>
+                                            <div class="text-gray-400 text-center py-2 text-[11px]">Select a parent job above to view its child tasks</div>
                                         @endforelse
                                     </div>
                                     @error('shiftTaskIds') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
@@ -583,10 +623,10 @@
                                         @error('shiftDateTo') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror
                                     </div>
                                 </div>
-                                <p class="text-[10px] text-gray-500 mt-1">Multi-dates are automatically broken down day-by-day in the right sidebar for bulk adding.</p>
                             </div>
                         @endif
 
+                        {{-- Start Time, End Time, Std Hours --}}
                         <div class="grid grid-cols-3 gap-2">
                             <div>
                                 <label class="text-xs font-semibold text-gray-700 block mb-1">Start*</label>
@@ -605,210 +645,129 @@
                             </div>
                         </div>
 
-                        {{-- Location & GPS Geofencing --}}
-                        <div x-data="shiftMapPicker()" @coordinates-updated.window="handleCoordinatesUpdated($event.detail)" class="border border-sky-200 bg-sky-50/60 rounded-xl p-3 space-y-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                                    <span>📍</span> Location & Geofencing (Site Preset)
-                                </span>
-                                @if($shiftLocationPresetId)
-                                    <span class="text-[9px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
-                                        🔒 Preset Locked (locked to preset)
-                                    </span>
-                                @endif
-                            </div>
+                        {{-- Break Settings --}}
+                        <div class="border border-amber-200 bg-amber-50/40 rounded-xl p-2.5 space-y-2">
+                            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-800">
+                                <input type="checkbox" wire:model.live="shiftHasBreak" class="rounded text-amber-600">
+                                <span>☕ Scheduled Break</span>
+                            </label>
 
-                            <div>
-                                <select wire:model.live="shiftLocationPresetId" class="w-full border rounded p-1.5 text-xs bg-white cursor-pointer font-medium focus:ring-1 focus:ring-blue-500">
-                                    <option value="">-- No Location / Remote Shift --</option>
-                                    @foreach($locationPresets as $preset)
-                                        <option value="{{ $preset->id }}">{{ $preset->display_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <input type="hidden" wire:model="shiftLocationName">
-                            <input type="hidden" wire:model="shiftLatitude">
-                            <input type="hidden" wire:model="shiftLongitude">
-                            <input type="hidden" wire:model="shiftGeofenceRadius">
-
-                            @if($shiftLocationPresetId && $shiftLatitude && $shiftLongitude)
-                                <div class="bg-white border border-sky-200 rounded p-2 text-xs flex justify-between items-center text-gray-700 shadow-2xs">
-                                    <span class="font-bold truncate max-w-[200px]" title="{{ $shiftLocationName }}">🏢 {{ $shiftLocationName }}</span>
-                                    <span class="text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.2 rounded border border-blue-100">Radius: {{ $shiftGeofenceRadius ?: 200 }}m</span>
+                            @if($shiftHasBreak)
+                                <div class="grid grid-cols-3 gap-2 pt-1 border-t border-amber-200/60 text-xs">
+                                    <div>
+                                        <label class="text-[10px] text-gray-600 block">Break Start</label>
+                                        <input type="time" wire:model.live="shiftBreakStart" class="w-full border rounded p-1 text-xs bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-gray-600 block">Break End</label>
+                                        <input type="time" wire:model.live="shiftBreakEnd" class="w-full border rounded p-1 text-xs bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-gray-600 block">Duration (mins)</label>
+                                        <input type="number" min="0" wire:model.live="shiftBreakMinutes" class="w-full border rounded p-1 text-xs bg-white">
+                                    </div>
                                 </div>
                             @endif
-
-                            <div wire:ignore class="rounded-lg overflow-hidden border border-gray-300 relative shadow-inner bg-slate-100">
-                                <div x-ref="shiftMapContainer" style="height: 130px; width: 100%;" class="z-0"></div>
-                            </div>
                         </div>
 
+                        {{-- Multi-day Breakdown (If multi-day) --}}
+                        @if($isMultiDay)
+                            <div class="border border-gray-200 rounded-xl p-3 bg-gray-50/60 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-bold text-gray-800 uppercase tracking-wide">Multi-Day Breakdown</label>
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-700">
+                                        <input type="checkbox" wire:model.live="excludeWeekends" class="rounded text-blue-600">
+                                        <span>Exclude Weekends</span>
+                                    </label>
+                                </div>
+
+                                <div class="max-h-44 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                    <table class="w-full text-xs text-left">
+                                        <thead class="bg-gray-50 border-b border-gray-200 text-gray-600 text-[10px] sticky top-0">
+                                            <tr>
+                                                <th class="p-1.5 text-center">Inc</th>
+                                                <th class="p-1.5">Date</th>
+                                                <th class="p-1.5 text-center">Hours</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            @foreach($shiftDaysBreakdown as $idx => $dayItem)
+                                                <tr class="{{ !empty($dayItem['enabled']) ? 'bg-white' : 'opacity-50 bg-gray-50' }}">
+                                                    <td class="p-1.5 text-center">
+                                                        <input type="checkbox" wire:click="toggleShiftDayEnabled({{ $idx }})" @checked(!empty($dayItem['enabled'])) class="rounded text-[#005a9c]">
+                                                    </td>
+                                                    <td class="p-1.5">
+                                                        <div class="font-bold text-gray-900">{{ $dayItem['formatted'] ?? $dayItem['date'] }}</div>
+                                                    </td>
+                                                    <td class="p-1.5 text-center">
+                                                        <input type="number" step="0.25" min="0" max="24" wire:model.live.debounce.300ms="shiftDaysBreakdown.{{ $idx }}.hours" class="w-14 border rounded p-0.5 text-center font-mono text-xs">
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Shift Notes --}}
                         <div>
                             <label class="text-xs font-semibold text-gray-700 block mb-1">Shift Notes / Instructions</label>
                             <textarea wire:model="shiftNotes" rows="2" placeholder="Optional notes for shift..." class="w-full border rounded p-2 text-xs bg-white"></textarea>
                         </div>
                     </div>
 
-                    @if($isMultiDay)
-                        {{-- Right Column / Sidebar: Dates & Shifts Breakdown (col-span-7) --}}
-                        <div class="lg:col-span-7 space-y-3 flex flex-col h-auto">
-                        @php
-                            $weeklyList = $this->shiftWeeklyBreakdown;
-                            $totalWeeks = count($weeklyList);
-                            $currentPage = max(0, min($this->shiftBreakdownWeekPage, max(0, $totalWeeks - 1)));
-                            $currentWeek = $weeklyList[$currentPage] ?? null;
-
-                            $totalDaysCount = 0;
-                            $totalNetMins = 0;
-                            $totalBreakMins = 0;
-                            foreach($this->shiftDaysBreakdown as $d) {
-                                if(!empty($d['enabled']) && (float)($d['hours'] ?? 0) > 0) {
-                                    $totalDaysCount++;
-                                    $hMins = (int) round(((float)$d['hours']) * 60);
-                                    $totalNetMins += $hMins;
-                                    if(!empty($d['has_break'])) {
-                                        $totalBreakMins += (int)($d['break_minutes'] ?? 0);
-                                    }
-                                }
-                            }
-                        @endphp
-
-                        <div class="flex justify-between items-center mb-1">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-800 uppercase tracking-wider">Dates & Shifts Breakdown (Bulk Adding)</label>
-                                <span class="text-[11px] text-gray-500">Day by day split with hours, check/uncheck & break to/from</span>
-                            </div>
-                            @if($totalWeeks > 1)
-                                <div class="text-[11px] font-bold text-[#005a9c] bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
-                                    Week {{ $currentPage + 1 }} of {{ $totalWeeks }}
-                                </div>
+                    {{-- COLUMN 3 (RIGHTMOST COLUMN): LOCATION & MAP --}}
+                    <div x-data="shiftMapPicker()"
+                         @coordinates-updated.window="handleCoordinatesUpdated($event.detail)"
+                         class="lg:col-span-4 flex flex-col border border-sky-200 bg-sky-50/50 rounded-xl p-3.5 space-y-3 max-h-[72vh] overflow-y-auto">
+                        
+                        <div class="flex items-center justify-between pb-2 border-b border-sky-200/70">
+                            <span class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                                <span>📍</span> Location & GPS Map
+                            </span>
+                            @if($shiftLocationPresetId)
+                                <span class="text-[9px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
+                                    🔒 Preset Locked (locked to preset)
+                                </span>
                             @endif
                         </div>
 
-                        @if(!$editingShiftId)
-                            <div class="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200 text-xs">
-                                <label class="inline-flex items-center gap-1.5 cursor-pointer font-medium text-gray-700 select-none">
-                                    <input type="checkbox" wire:model.live="excludeWeekends" class="rounded text-blue-600 focus:ring-blue-500">
-                                    <span>Exclude Weekends</span>
-                                </label>
-                                <div class="flex items-center gap-2 text-[11px] text-blue-600 font-medium">
-                                    <button type="button" wire:click="selectAllShiftDays" class="hover:underline">Select All</button>
-                                    <span class="text-gray-300">|</span>
-                                    <button type="button" wire:click="deselectAllShiftDays" class="hover:underline text-gray-500">Deselect All</button>
-                                </div>
+                        {{-- Location Preset Selector --}}
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">Site Preset</label>
+                            <select wire:model.live="shiftLocationPresetId" class="w-full border rounded p-1.5 text-xs bg-white cursor-pointer font-medium focus:ring-1 focus:ring-blue-500">
+                                <option value="">-- No Location / Remote Shift --</option>
+                                @foreach($locationPresets as $preset)
+                                    <option value="{{ $preset->id }}">{{ $preset->display_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <input type="hidden" wire:model="shiftLocationName">
+                        <input type="hidden" wire:model="shiftLatitude">
+                        <input type="hidden" wire:model="shiftLongitude">
+                        <input type="hidden" wire:model="shiftGeofenceRadius">
+
+                        @if($shiftLocationPresetId && $shiftLatitude && $shiftLongitude)
+                            <div class="bg-white border border-sky-200 rounded p-2 text-xs flex justify-between items-center text-gray-700 shadow-2xs">
+                                <span class="font-bold truncate max-w-[200px]" title="{{ $shiftLocationName }}">🏢 {{ $shiftLocationName }}</span>
+                                <span class="text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.2 rounded border border-blue-100">Radius: {{ $shiftGeofenceRadius ?: 200 }}m</span>
                             </div>
                         @endif
 
-                        @if($totalWeeks > 1)
-                            <div class="flex items-center justify-between bg-slate-50 border border-gray-200 rounded-t-lg p-2 text-xs">
-                                <button type="button" wire:click="prevShiftBreakdownWeek" @disabled($currentPage <= 0)
-                                        class="px-2.5 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed font-medium text-gray-700 flex items-center gap-1 shadow-2xs transition">
-                                    <span>&larr; Prev Week</span>
-                                </button>
-                                <div class="text-center px-1">
-                                    <div class="font-bold text-gray-800 text-xs">{{ $currentWeek['label'] ?? '' }}</div>
-                                    <div class="text-[10px] text-gray-500 font-medium">
-                                        {{ count($currentWeek['days'] ?? []) }} day(s) &bull; {{ \App\Services\ReportDataService::formatHoursToHM($currentWeek['total_hours'] ?? 0) }}
-                                    </div>
-                                </div>
-                                <button type="button" wire:click="nextShiftBreakdownWeek" @disabled($currentPage >= $totalWeeks - 1)
-                                        class="px-2.5 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed font-medium text-gray-700 flex items-center gap-1 shadow-2xs transition">
-                                    <span>Next Week &rarr;</span>
-                                </button>
+                        {{-- Leaflet Map Container --}}
+                        <div class="flex-1 flex flex-col min-h-[300px]">
+                            <div wire:ignore class="rounded-lg overflow-hidden border border-gray-300 relative shadow-inner bg-slate-100 flex-1 h-[320px]">
+                                <div x-ref="shiftMapContainer" style="height: 320px; width: 100%;" class="z-0"></div>
                             </div>
-                        @endif
-
-                        <div class="border {{ $totalWeeks > 1 ? 'border-t-0' : '' }} border-gray-200 rounded-b-lg overflow-hidden h-auto max-h-[360px] overflow-y-auto bg-white">
-                            <table class="w-full text-xs text-left">
-                                <thead class="bg-gray-50 border-b border-gray-200 font-semibold text-gray-600 sticky top-0 z-10 text-[11px]">
-                                <tr>
-                                    <th class="p-2 w-8 text-center">Include</th>
-                                    <th class="p-2">Date</th>
-                                    <th class="p-2 w-24 text-center">Shift Hours</th>
-                                    <th class="p-2 text-right">Daily Total</th>
-                                </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                @php
-                                    $daysToDisplay = $totalWeeks > 0 ? ($currentWeek['days'] ?? []) : $this->shiftDaysBreakdown;
-                                @endphp
-                                @forelse($daysToDisplay as $dayItem)
-                                    @php
-                                        $index = $dayItem['original_index'] ?? $loop->index;
-                                        $isEnabled = !empty($this->shiftDaysBreakdown[$index]['enabled']);
-                                        $dayHrs = (float)($this->shiftDaysBreakdown[$index]['hours'] ?? 0);
-                                        $netMins = $isEnabled ? max(0, (int)round($dayHrs * 60)) : 0;
-                                    @endphp
-                                    <tr class="{{ $dayItem['is_weekend'] ? 'bg-amber-50/30' : 'bg-white' }} {{ !$isEnabled ? 'opacity-50 bg-gray-50/50' : 'hover:bg-blue-50/20' }} transition">
-                                        <td class="p-2 text-center align-middle">
-                                            <input type="checkbox"
-                                                   wire:click="toggleShiftDayEnabled({{ $index }})"
-                                                   @checked($isEnabled)
-                                                   class="rounded text-[#005a9c] cursor-pointer">
-                                        </td>
-                                        <td class="p-2 align-middle">
-                                            <div class="font-bold {{ $isEnabled ? 'text-gray-900' : 'text-gray-400' }}">{{ $dayItem['formatted'] }}</div>
-                                            <div class="text-[10px] {{ $dayItem['is_weekend'] ? 'text-amber-600 font-medium' : 'text-gray-400' }}">
-                                                {{ $dayItem['day_name'] }} {{ $dayItem['is_weekend'] ? '(Weekend)' : '' }}
-                                            </div>
-                                        </td>
-                                        <td class="p-2 align-middle text-center">
-                                            <div class="inline-flex items-center gap-1">
-                                                <input type="number" step="0.25" min="0" max="24"
-                                                       wire:model.live.debounce.300ms="shiftDaysBreakdown.{{ $index }}.hours"
-                                                       @disabled(!$isEnabled)
-                                                       class="w-16 border rounded p-1 text-center font-mono text-xs {{ $isEnabled ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 text-gray-400' }}">
-                                                <span class="text-[10px] text-gray-500">h</span>
-                                            </div>
-                                        </td>
-                                        <td class="p-2 text-right align-middle font-mono font-semibold {{ $isEnabled ? 'text-gray-800' : 'text-gray-300' }}">
-                                            {{ \App\Services\ReportDataService::formatDurationHM($netMins) }}
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="p-6 text-center text-gray-400">
-                                            Select a valid date range to view the day-by-day split.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                                </tbody>
-                            </table>
+                            <p class="text-[10px] text-gray-500 mt-1 italic text-center">Interactive site location & geofence boundary</p>
                         </div>
+                    </div>
 
-                        {{-- Summary Metrics Box --}}
-                        @php
-                            $empCount = count($shiftEmployeeIds) ?: 1;
-                            $taskCount = count($shiftTaskIds) ?: (count($shiftAssignmentIds) ?: 1);
-                            $totalShifts = $totalDaysCount * $empCount * $taskCount;
-                            $grandTotalMins = $totalNetMins * $empCount * $taskCount;
-                        @endphp
-                        <div class="bg-blue-50/60 border border-blue-200 rounded-lg p-3 text-xs mt-auto">
-                            <div class="grid grid-cols-4 gap-2 text-center">
-                                <div>
-                                    <span class="text-gray-500 block text-[10px]">Dates</span>
-                                    <strong class="text-xs text-gray-800">{{ $totalDaysCount }} day(s)</strong>
-                                </div>
-                                <div>
-                                    <span class="text-gray-500 block text-[10px]">Employees</span>
-                                    <strong class="text-xs text-indigo-700">{{ $empCount }}</strong>
-                                </div>
-                                <div>
-                                    <span class="text-gray-500 block text-[10px]">Jobs / Tasks</span>
-                                    <strong class="text-xs text-emerald-700">{{ $taskCount }}</strong>
-                                </div>
-                                <div>
-                                    <span class="text-gray-500 block text-[10px]">Total Shifts (Work)</span>
-                                    <strong class="text-xs text-[#005a9c] font-bold">
-                                        {{ $totalShifts }} ({{ \App\Services\ReportDataService::formatDurationHM($grandTotalMins) }})
-                                    </strong>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
                 </div>
 
+                {{-- MODAL FOOTER --}}
                 <div class="flex justify-between items-center mt-4 pt-3 border-t border-gray-200">
                     <div>
                         @if($editingShiftId)

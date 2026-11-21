@@ -22,6 +22,7 @@ class ScheduleBoard extends Component
 
     public $showAddShift = false;
     public $editingShiftId = null;
+    public $employeeSearch = '';
     public $shiftEmployeeId = null;
     public array $shiftEmployeeIds = [];
     public $shiftAssignmentId = null;
@@ -530,7 +531,7 @@ class ScheduleBoard extends Component
         $this->reset([
             'editingShiftId', 'shiftEmployeeId', 'shiftEmployeeIds', 'shiftAssignmentId', 'shiftAssignmentIds',
             'shiftTaskId', 'shiftTaskIds', 'shiftNotes', 'shiftLatitude', 'shiftLongitude', 'shiftLocationName',
-            'shiftDaysBreakdown', 'shiftBreakdownWeekPage',
+            'shiftDaysBreakdown', 'shiftBreakdownWeekPage', 'employeeSearch',
         ]);
         $targetDate                = $date ?: Carbon::now()->toDateString();
         $this->shiftDate           = $targetDate;
@@ -587,6 +588,23 @@ class ScheduleBoard extends Component
         }
     }
 
+    public function toggleEmployeeSelection($id)
+    {
+        $id = (int)$id;
+        if ($this->editingShiftId) {
+            $this->shiftEmployeeId = $id;
+            $this->shiftEmployeeIds = [$id];
+            return;
+        }
+
+        if (in_array($id, $this->shiftEmployeeIds, true)) {
+            $this->shiftEmployeeIds = array_values(array_diff($this->shiftEmployeeIds, [$id]));
+        } else {
+            $this->shiftEmployeeIds[] = $id;
+        }
+        $this->shiftEmployeeId = $this->shiftEmployeeIds[0] ?? null;
+    }
+
     public function selectAllEmployees()
     {
         $user = auth()->user();
@@ -595,8 +613,17 @@ class ScheduleBoard extends Component
         if ($accessibleIds !== null) {
             $q->whereIn('id', $accessibleIds);
         }
-        $this->shiftEmployeeIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
-        if (!empty($this->shiftEmployeeIds)) {
+        if (!empty($this->employeeSearch)) {
+            $search = '%' . trim($this->employeeSearch) . '%';
+            $q->where(function ($sq) use ($search) {
+                $sq->where('name', 'like', $search)
+                   ->orWhere('email', 'like', $search)
+                   ->orWhere('role', 'like', $search);
+            });
+        }
+        $newIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        $this->shiftEmployeeIds = array_values(array_unique(array_merge($this->shiftEmployeeIds, $newIds)));
+        if (!empty($this->shiftEmployeeIds) && !$this->shiftEmployeeId) {
             $this->shiftEmployeeId = $this->shiftEmployeeIds[0];
         }
     }
@@ -610,6 +637,9 @@ class ScheduleBoard extends Component
     public function selectAllJobs()
     {
         $this->shiftAssignmentIds = Assignment::where('status', '!=', 'inactive')->ongoing()->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        if (count($this->shiftAssignmentIds) === 1) {
+            $this->shiftAssignmentId = $this->shiftAssignmentIds[0];
+        }
     }
 
     public function clearJobs()
@@ -626,7 +656,23 @@ class ScheduleBoard extends Component
         if (!empty($this->shiftAssignmentIds)) {
             $q->whereIn('assignment_id', $this->shiftAssignmentIds);
         }
-        $this->shiftTaskIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        $taskIds = $q->pluck('id')->map(fn($id) => (int)$id)->toArray();
+        $this->shiftTaskIds = $taskIds;
+
+        // Auto-select parent jobs of these child tasks
+        $parentJobIds = Task::whereIn('id', $taskIds)
+            ->whereNotNull('assignment_id')
+            ->pluck('assignment_id')
+            ->map(fn($id) => (int)$id)
+            ->unique()
+            ->toArray();
+        $this->shiftAssignmentIds = array_values(array_unique(array_merge($this->shiftAssignmentIds, $parentJobIds)));
+        if (count($this->shiftAssignmentIds) === 1) {
+            $this->shiftAssignmentId = $this->shiftAssignmentIds[0];
+        }
+        if (count($taskIds) === 1) {
+            $this->shiftTaskId = $taskIds[0];
+        }
     }
 
     public function clearTasks()
@@ -637,6 +683,7 @@ class ScheduleBoard extends Component
 
     public function toggleJobTasks($jobId)
     {
+        $jobId = (int)$jobId;
         $jobTaskIds = Task::where('assignment_id', $jobId)
             ->where('status', '!=', 'inactive')
             ->ongoing()
@@ -649,15 +696,46 @@ class ScheduleBoard extends Component
             $this->shiftTaskIds = array_values(array_diff($this->shiftTaskIds, $jobTaskIds));
         } else {
             $this->shiftTaskIds = array_values(array_unique(array_merge($this->shiftTaskIds, $jobTaskIds)));
+            // Interdependent: Ensure the parent job is selected
+            if (!in_array($jobId, $this->shiftAssignmentIds, true)) {
+                $this->shiftAssignmentIds[] = $jobId;
+            }
+            $this->shiftAssignmentId = $jobId;
         }
     }
+
+    public function updatedShiftAssignmentIds($values)
+    {
+        $selectedJobIds = array_map('intval', (array)$values);
+        $this->shiftAssignmentIds = $selectedJobIds;
+        if (!empty($selectedJobIds)) {
+            // Keep only child tasks belonging to the selected parent jobs
+            $validTaskIds = Task::whereIn('assignment_id', $selectedJobIds)
+                ->pluck('id')
+                ->map(fn($id) => (int)$id)
+                ->toArray();
+            $this->shiftTaskIds = array_values(array_intersect(array_map('intval', $this->shiftTaskIds), $validTaskIds));
+            if ($this->shiftTaskId && !in_array((int)$this->shiftTaskId, $validTaskIds, true)) {
+                $this->shiftTaskId = null;
+            }
+            if (count($selectedJobIds) === 1) {
+                $this->shiftAssignmentId = $selectedJobIds[0];
+            }
+        } else {
+            $this->shiftTaskIds = [];
+            $this->shiftTaskId = null;
+            $this->shiftAssignmentId = null;
+        }
+    }
+
+
 
     public function cancelShift()
     {
         $this->showAddShift = false;
         $this->reset([
             'editingShiftId', 'shiftEmployeeId', 'shiftEmployeeIds', 'shiftAssignmentId', 'shiftAssignmentIds',
-            'shiftTaskId', 'shiftTaskIds', 'shiftNotes',
+            'shiftTaskId', 'shiftTaskIds', 'shiftNotes', 'employeeSearch',
             'shiftLatitude', 'shiftLongitude', 'shiftLocationName', 'shiftLocationPresetId',
             'shiftDaysBreakdown', 'shiftBreakdownWeekPage',
         ]);
@@ -677,9 +755,16 @@ class ScheduleBoard extends Component
 
     public function updatedShiftAssignmentId($value)
     {
-        $this->shiftTaskId = null;
         if ($value) {
             $this->shiftAssignmentIds = [(int)$value];
+            // Clear task if it does not belong to this newly selected parent job
+            if ($this->shiftTaskId) {
+                $task = Task::find($this->shiftTaskId);
+                if (!$task || $task->assignment_id != $value) {
+                    $this->shiftTaskId = null;
+                    $this->shiftTaskIds = [];
+                }
+            }
             $job = Assignment::find($value);
             if ($job) {
                 if ($job->location_id) {
@@ -698,6 +783,9 @@ class ScheduleBoard extends Component
                     ]);
                 }
             }
+        } else {
+            $this->shiftTaskId = null;
+            $this->shiftTaskIds = [];
         }
     }
 
@@ -746,6 +834,7 @@ class ScheduleBoard extends Component
             $this->shiftTaskIds = [(int)$value];
             $task = Task::find($value);
             if ($task) {
+                // Interdependent child-parent: Auto-select parent job!
                 if ($task->assignment_id) {
                     $this->shiftAssignmentId = $task->assignment_id;
                     $this->shiftAssignmentIds = [(int)$task->assignment_id];
@@ -1514,6 +1603,7 @@ class ScheduleBoard extends Component
         $rawSchedulesQuery = Schedule::with(['employee', 'assignment', 'task'])
             ->whereBetween('shift_date', [$start->toDateString(), $end->toDateString()])
             ->whereIn('employee_id', $employees->pluck('id'))
+            ->whereNotNull('task_id')
             ->whereDoesntHave('assignment', fn($q) => $q->where('status', 'inactive'))
             ->whereDoesntHave('task', fn($q) => $q->where('status', 'inactive'));
 
@@ -1565,21 +1655,30 @@ class ScheduleBoard extends Component
             }
         }
 
-        // Include employees who don't have any shifts yet this week
+        // Only include employees who have been assigned a task:
+        // 1. Employees with scheduled shifts containing an assigned task are already added above in $groupedRows.
+        // 2. For employees without shifts this week, only include them if they have assigned tasks configured in their employee profile:
         $scheduledEmpIds = $groupedRows->pluck('employee_id')->unique();
         foreach ($employees as $emp) {
-            if (!$scheduledEmpIds->contains($emp->id)) {
-                $groupedRows->push([
-                    'group_key'   => '0_0',
-                    'job_id'      => null,
-                    'job'         => null,
-                    'task_id'     => null,
-                    'task'        => null,
-                    'employee_id' => $emp->id,
-                    'employee'    => $emp,
-                    'shifts'      => collect(),
-                    'total_hours' => 0.0,
-                ]);
+            if ($scheduledEmpIds->contains($emp->id)) {
+                continue;
+            }
+            $assignedTaskIds = array_filter(array_map('intval', $emp->permissions['assigned_tasks'] ?? []));
+            if (!empty($assignedTaskIds)) {
+                $empTasks = Task::with('assignment')->whereIn('id', $assignedTaskIds)->where('status', '!=', 'inactive')->get();
+                foreach ($empTasks as $task) {
+                    $groupedRows->push([
+                        'group_key'   => ($task->assignment_id ?: '0') . '_' . $task->id,
+                        'job_id'      => $task->assignment_id,
+                        'job'         => $task->assignment,
+                        'task_id'     => $task->id,
+                        'task'        => $task,
+                        'employee_id' => $emp->id,
+                        'employee'    => $emp,
+                        'shifts'      => collect(),
+                        'total_hours' => 0.0,
+                    ]);
+                }
             }
         }
 
@@ -1589,6 +1688,17 @@ class ScheduleBoard extends Component
             fn ($a, $b) => strcmp($a['task']?->name ?? 'ZZZ', $b['task']?->name ?? 'ZZZ'),
             fn ($a, $b) => strcmp($a['employee']->name, $b['employee']->name),
         ])->values();
+
+        // Modal employees filtered by search query
+        $modalEmployees = $filterEmployees;
+        if (!empty($this->employeeSearch)) {
+            $search = strtolower(trim($this->employeeSearch));
+            $modalEmployees = $modalEmployees->filter(function ($e) use ($search) {
+                return str_contains(strtolower($e->name), $search)
+                    || str_contains(strtolower($e->email ?? ''), $search)
+                    || str_contains(strtolower($e->role ?? ''), $search);
+            });
+        }
 
         // Legacy format for backwards compatibility
         $schedules = $rawSchedules
@@ -1651,6 +1761,7 @@ class ScheduleBoard extends Component
             'calMonthTitle'        => $calMonthTitle,
             'employees'            => $employees,
             'filterEmployees'      => $filterEmployees,
+            'modalEmployees'       => $modalEmployees,
             'jobs'                 => $jobs,
             'tasks'                => $tasks,
             'assignableJobs'       => $assignableJobs,

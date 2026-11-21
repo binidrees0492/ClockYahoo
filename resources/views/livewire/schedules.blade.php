@@ -101,7 +101,7 @@
 
                         <div>
                             <label class="font-semibold text-gray-700 block mb-1">Job / Assignment <span class="text-red-500">*</span></label>
-                            <select wire:model="assignmentId" class="w-full border rounded p-2 text-xs bg-white">
+                            <select wire:model.live="assignmentId" class="w-full border rounded p-2 text-xs bg-white">
                                 <option value="">Select Job</option>
                                 @foreach($assignments as $a)
                                     <option value="{{ $a->id }}">{{ $a->name }}</option>
@@ -112,10 +112,13 @@
 
                         <div>
                             <label class="font-semibold text-gray-700 block mb-1">Task <span class="text-red-500">*</span> <span class="text-gray-400 font-normal">(Sets GPS coordinates)</span></label>
+                            @php
+                                $filteredTasks = $assignmentId ? $tasks->where('assignment_id', $assignmentId) : $tasks;
+                            @endphp
                             <select wire:model.live="taskId" class="w-full border rounded p-2 text-xs bg-white font-medium">
                                 <option value="">Select Task</option>
-                                @foreach($tasks as $t)
-                                    <option value="{{ $t->id }}">{{ $t->name }}</option>
+                                @foreach($filteredTasks as $t)
+                                    <option value="{{ $t->id }}">{{ $t->name }} {{ $t->assignment ? '('.$t->assignment->name.')' : '' }}</option>
                                 @endforeach
                             </select>
                             @error('taskId') <p class="text-red-500 text-[10px] mt-0.5">{{ $message }}</p> @enderror

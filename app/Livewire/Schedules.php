@@ -79,11 +79,24 @@ class Schedules extends Component
         $this->showModal      = true;
     }
 
+    public function updatedAssignmentId($val)
+    {
+        if ($this->taskId) {
+            $task = Task::find($this->taskId);
+            if (!$task || $task->assignment_id != $val) {
+                $this->taskId = null;
+            }
+        }
+    }
+
     public function updatedTaskId($val)
     {
         if ($val) {
             $task = Task::find($val);
             if ($task) {
+                if ($task->assignment_id) {
+                    $this->assignmentId = $task->assignment_id;
+                }
                 $this->latitude       = $task->latitude;
                 $this->longitude      = $task->longitude;
                 $this->geofenceRadius = $task->geofence_radius ?: 200;
