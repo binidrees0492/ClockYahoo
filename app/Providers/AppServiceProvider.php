@@ -19,13 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Enforce application default timezone dynamically across PHP, Carbon, and Laravel
+        // Enforce application default timezone strictly as UTC for canonical storage & event tracking
+        @date_default_timezone_set('UTC');
+        config(['app.timezone' => 'UTC']);
         try {
-            $appTz = \App\Models\CompanySetting::getServerTimezone() ?: config('app.timezone', 'America/New_York');
-            if ($appTz) {
-                @date_default_timezone_set($appTz);
-                config(['app.timezone' => $appTz]);
-            }
             \App\Services\EmailService::applyRuntimeMailConfig();
         } catch (\Throwable $e) {
             // Graceful fallback during initial migrations or setup

@@ -74,7 +74,8 @@ class TimeClock extends Component
     public function mount()
     {
         $user = Auth::user();
-        $today = Carbon::today()->toDateString();
+        $activeTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
+        $today = Carbon::now($activeTz)->toDateString();
         $this->assignments = $user ? $user->getAssignedJobs($today) : Assignment::ongoing()->orderBy('name')->get();
         $this->tasks       = $user ? $user->getAssignedTasks(null, $today) : Task::ongoing()->orderBy('name')->get();
 
@@ -103,7 +104,7 @@ class TimeClock extends Component
         $activeTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
         $tzAbbr = $user ? $user->getTimezoneAbbr() : 'UTC';
 
-        $today = Carbon::today()->toDateString();
+        $today = Carbon::now($activeTz)->toDateString();
         $this->assignments = $user ? $user->getAssignedJobs($today) : Assignment::ongoing()->orderBy('name')->get();
         $this->tasks       = $user ? $user->getAssignedTasks(null, $today) : Task::ongoing()->orderBy('name')->get();
 
@@ -129,7 +130,7 @@ class TimeClock extends Component
             $this->shiftPriorNetSeconds = 0;
             $this->completedBreakSeconds = 0;
             $this->breakStartEpoch      = null;
-            $this->serverEpoch          = Carbon::now()->getTimestampMs();
+            $this->serverEpoch          = Carbon::now('UTC')->getTimestampMs();
             $this->resetTimer();
             $this->loadRecentActivity();
             return;
@@ -160,9 +161,9 @@ class TimeClock extends Component
         $this->shiftPriorNetSeconds  = $priorSecs;
         $this->completedBreakSeconds = $log->completedBreakSeconds();
         $this->breakStartEpoch       = $log->getBreakStartedAtCarbon() ? $log->getBreakStartedAtCarbon()->getTimestampMs() : null;
-        $this->serverEpoch           = Carbon::now()->getTimestampMs();
+        $this->serverEpoch           = Carbon::now('UTC')->getTimestampMs();
 
-        $clockInUserTz = $log->getClockInCarbon() ? $log->getClockInCarbon()->copy()->setTimezone($activeTz) : null;
+        $clockInUserTz = $log->getClockInInTimezone($activeTz);
         $shiftStartUserTz = $shiftStart ? $shiftStart->copy()->setTimezone($activeTz) : null;
 
         if ($this->hasSwitched) {
@@ -302,8 +303,9 @@ class TimeClock extends Component
         }
 
         $user = Auth::user();
-        $today = Carbon::today()->toDateString();
-        $now = Carbon::now();
+        $activeTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
+        $today = Carbon::now($activeTz)->toDateString();
+        $nowUtc = Carbon::now('UTC');
 
         if ($user && $user->isEmployee() && !$user->canAccessAdmin()) {
             $assignedJobIds = $user->getAssignedJobs($today)->pluck('id')->toArray();
@@ -367,7 +369,7 @@ class TimeClock extends Component
                 return;
             }
 
-            if (!$matchingJobSchedule->coversTime($now, 30, 30)) {
+            if (!$matchingJobSchedule->coversTime($nowUtc, 30, 30)) {
                 $startFmt = $matchingJobSchedule->start_carbon ? $matchingJobSchedule->start_carbon->format('g:i A') : 'scheduled start';
                 $endFmt = $matchingJobSchedule->end_carbon ? $matchingJobSchedule->end_carbon->format('g:i A') : 'scheduled end';
                 $this->toast("Your scheduled shift is from {$startFmt} to {$endFmt}. You can only clock in during your scheduled shift date and time.", 'error');
@@ -386,8 +388,7 @@ class TimeClock extends Component
             $task
         );
 
-        $now = Carbon::now();
-        $shiftId = 'shift_' . Auth::id() . '_' . $now->timestamp;
+        $shiftId = 'shift_' . Auth::id() . '_' . $nowUtc->timestamp;
 
         $log = TimeLog::create([
             'employee_id'          => Auth::id(),
@@ -395,8 +396,8 @@ class TimeClock extends Component
             'assignment_id'        => $this->selectedAssignment,
             'task_id'              => $this->selectedTask,
             'hourly_rate'          => $task ? $task->getHourlyRateFor(Auth::user()) : (Auth::user()->base_pay ?: null),
-            'timezone'             => CompanySetting::getServerTimezone() ?: config('app.timezone', 'America/New_York'),
-            'clock_in'             => $now,
+            'timezone'             => $activeTz,
+            'clock_in'             => $nowUtc,
             'status'               => 'active',
             'clock_in_latitude'    => $lat ? (float) $lat : null,
             'clock_in_longitude'   => $lng ? (float) $lng : null,
@@ -469,15 +470,17 @@ class TimeClock extends Component
         }
 
         $clockIn = $log->getClockInCarbon() ?: $log->clock_in;
-        $now = Carbon::now($log->getLogTimezone());
-        $elapsedSeconds = $clockIn ? abs($now->getTimestamp() - $clockIn->getTimestamp()) : 999;
+        $nowUtc = Carbon::now('UTC');
+        $elapsedSeconds = $clockIn ? abs($nowUtc->getTimestamp() - $clockIn->getTimestamp()) : 999;
         if ($elapsedSeconds < 60) {
             $remaining = 60 - $elapsedSeconds;
             $this->toast("Please wait at least 1 minute after clocking in before clocking out to avoid accidental double-clicks ({$remaining}s remaining).", 'warning');
             return;
         }
 
-        $today = Carbon::today()->toDateString();
+        $user = Auth::user();
+        $activeTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
+        $today = Carbon::now($activeTz)->toDateString();
         $schedule = \App\Models\Schedule::where('employee_id', Auth::id())
             ->where(function ($q) {
                 $q->where('status', 'published')->orWhere('is_published', true);
@@ -503,12 +506,11 @@ class TimeClock extends Component
 
         if ($log->isOnBreak()) {
             $breakStart = $log->getBreakStartedAtCarbon();
-            $now        = Carbon::now($log->getLogTimezone());
-            $diffSecs   = $breakStart ? abs($now->getTimestamp() - $breakStart->getTimestamp()) : 0;
+            $diffSecs   = $breakStart ? abs($nowUtc->getTimestamp() - $breakStart->getTimestamp()) : 0;
             $breaks     = $log->breaks ?? [];
             $breaks[]   = [
-                'start'   => $breakStart ? $breakStart->toIso8601String() : $now->toIso8601String(),
-                'end'     => $now->toIso8601String(),
+                'start'   => $breakStart ? $breakStart->toIso8601String() : $nowUtc->toIso8601String(),
+                'end'     => $nowUtc->toIso8601String(),
                 'seconds' => $diffSecs,
                 'minutes' => (int) round($diffSecs / 60),
             ];
@@ -517,7 +519,7 @@ class TimeClock extends Component
             $log->break_started_at = null;
         }
 
-        $log->clock_out           = Carbon::now($log->getLogTimezone());
+        $log->clock_out           = $nowUtc;
         $log->duration_minutes    = (int) ceil($log->netSeconds() / 60);
         $log->status              = 'completed';
         $log->clock_out_latitude  = $lat ? (float) $lat : null;
@@ -555,7 +557,7 @@ class TimeClock extends Component
         $log = $this->currentLog();
         if (!$log || $log->isOnBreak()) return;
 
-        $log->break_started_at = Carbon::now($log->getLogTimezone());
+        $log->break_started_at = Carbon::now('UTC');
         $log->status           = 'on_break';
         $log->save();
 
@@ -569,13 +571,13 @@ class TimeClock extends Component
         if (!$log || !$log->isOnBreak()) return;
 
         $breakStart = $log->getBreakStartedAtCarbon();
-        $now        = Carbon::now($log->getLogTimezone());
-        $diffSecs   = $breakStart ? abs($now->getTimestamp() - $breakStart->getTimestamp()) : 0;
+        $nowUtc     = Carbon::now('UTC');
+        $diffSecs   = $breakStart ? abs($nowUtc->getTimestamp() - $breakStart->getTimestamp()) : 0;
 
         $breaks = $log->breaks ?? [];
         $breaks[] = [
-            'start'   => $breakStart ? $breakStart->toIso8601String() : $now->toIso8601String(),
-            'end'     => $now->toIso8601String(),
+            'start'   => $breakStart ? $breakStart->toIso8601String() : $nowUtc->toIso8601String(),
+            'end'     => $nowUtc->toIso8601String(),
             'seconds' => $diffSecs,
             'minutes' => (int) round($diffSecs / 60),
         ];

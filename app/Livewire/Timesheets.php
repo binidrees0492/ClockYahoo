@@ -164,12 +164,13 @@ class Timesheets extends Component
     public function startEdit($logId)
     {
         $log = TimeLog::where('employee_id', Auth::id())->findOrFail($logId);
+        $userTz = Auth::user()?->getTimezone() ?: CompanySetting::getServerTimezone();
 
         $this->editingLogId   = $log->id;
         $this->editAssignment = $log->assignment_id;
         $this->editTask       = $log->task_id;
-        $this->editClockIn    = $log->clock_in?->format('Y-m-d\TH:i');
-        $this->editClockOut   = $log->clock_out?->format('Y-m-d\TH:i');
+        $this->editClockIn    = $log->clock_in ? $log->clock_in->copy()->setTimezone($userTz)->format('Y-m-d\TH:i') : null;
+        $this->editClockOut   = $log->clock_out ? $log->clock_out->copy()->setTimezone($userTz)->format('Y-m-d\TH:i') : null;
         $this->editNotes      = $log->notes;
     }
 
@@ -197,16 +198,21 @@ class Timesheets extends Component
         }
 
         $log = TimeLog::where('employee_id', Auth::id())->findOrFail($this->editingLogId);
+        $userTz = Auth::user()?->getTimezone() ?: CompanySetting::getServerTimezone();
+
+        $inLocal = Carbon::parse($this->editClockIn, $userTz);
+        $outLocal = $this->editClockOut ? Carbon::parse($this->editClockOut, $userTz) : null;
 
         $log->assignment_id = $this->editAssignment;
         $log->task_id       = $this->editTask;
-        $log->clock_in      = Carbon::parse($this->editClockIn);
-        $log->clock_out     = $this->editClockOut ? Carbon::parse($this->editClockOut) : null;
+        $log->clock_in      = $inLocal->copy()->utc();
+        $log->clock_out     = $outLocal ? $outLocal->copy()->utc() : null;
+        $log->timezone      = $userTz;
         $log->notes         = $this->editNotes;
 
-        if ($log->clock_out) {
+        if ($outLocal) {
             $log->duration_minutes = (int) ceil(
-                $log->clock_in->diffInMinutes($log->clock_out) - ($log->break_minutes ?: 0)
+                $inLocal->diffInMinutes($outLocal) - ($log->break_minutes ?: 0)
             );
         }
 
@@ -708,8 +714,9 @@ class Timesheets extends Component
                         return;
                     }
 
+                    $userTz = $targetUser->getTimezone();
                     $startTime = !empty($day['start_time']) ? $day['start_time'] : ($this->addDefaultStartTime ?: '09:00');
-                    $tempIn = Carbon::parse($targetDate . ' ' . $startTime);
+                    $tempIn = Carbon::parse($targetDate . ' ' . $startTime, $userTz);
                     $tempDur = (int) round(((float)$day['hours']) * 60);
                     $tempBrk = (!empty($day['has_break']) && !empty($day['break_minutes'])) ? (int) $day['break_minutes'] : 0;
                     $tempOut = $tempIn->copy()->addMinutes($tempDur + $tempBrk);
@@ -722,22 +729,23 @@ class Timesheets extends Component
                     }
                 }
 
+                $userTz = $targetUser->getTimezone();
                 $startTime = !empty($day['start_time']) ? $day['start_time'] : ($this->addDefaultStartTime ?: '09:00');
-                $in = Carbon::parse($targetDate . ' ' . $startTime);
+                $localIn = Carbon::parse($targetDate . ' ' . $startTime, $userTz);
 
                 $durationMinutes = (int) round(((float)$day['hours']) * 60);
                 $breakMinutes = (!empty($day['has_break']) && !empty($day['break_minutes'])) ? (int) $day['break_minutes'] : 0;
                 $grossMinutes = $durationMinutes + $breakMinutes;
-                $out = $in->copy()->addMinutes($grossMinutes);
+                $localOut = $localIn->copy()->addMinutes($grossMinutes);
 
                 $breaks = [];
                 if ($breakMinutes > 0) {
                     $halfWork = (int) round($durationMinutes / 2);
-                    $bStart = $in->copy()->addMinutes($halfWork);
+                    $bStart = $localIn->copy()->addMinutes($halfWork);
                     $bEnd = $bStart->copy()->addMinutes($breakMinutes);
                     $breaks[] = [
-                        'start'   => $bStart->toIso8601String(),
-                        'end'     => $bEnd->toIso8601String(),
+                        'start'   => $bStart->copy()->utc()->toIso8601String(),
+                        'end'     => $bEnd->copy()->utc()->toIso8601String(),
                         'seconds' => $breakMinutes * 60,
                     ];
                 }
@@ -747,8 +755,9 @@ class Timesheets extends Component
                     'assignment_id'    => $this->addAssignment,
                     'task_id'          => $this->addTask,
                     'hourly_rate'      => $hourlyRate,
-                    'clock_in'         => $in,
-                    'clock_out'        => $out,
+                    'timezone'         => $userTz,
+                    'clock_in'         => $localIn->copy()->utc(),
+                    'clock_out'        => $localOut->copy()->utc(),
                     'duration_minutes' => $durationMinutes,
                     'break_minutes'    => $breakMinutes,
                     'breaks'           => $breaks,
@@ -792,29 +801,30 @@ class Timesheets extends Component
             'addClockOut' => 'required|date|after:addClockIn',
         ]);
 
-        $in  = Carbon::parse($this->addClockIn);
-        $out = Carbon::parse($this->addClockOut);
+        $userTz = $targetUser->getTimezone();
+        $inLocal  = Carbon::parse($this->addClockIn, $userTz);
+        $outLocal = Carbon::parse($this->addClockOut, $userTz);
 
-        $grossMinutes = (int) ceil($in->diffInMinutes($out));
+        $grossMinutes = (int) ceil($inLocal->diffInMinutes($outLocal));
         $breakMinutes = 0;
         $breaks = [];
 
         if ($this->hasBreak && $this->addBreakStart && $this->addBreakEnd) {
-            $bStart = Carbon::parse($in->toDateString() . ' ' . $this->addBreakStart);
-            $bEnd   = Carbon::parse($in->toDateString() . ' ' . $this->addBreakEnd);
-            if ($bEnd->gt($bStart)) {
-                $bSecs = $bStart->diffInSeconds($bEnd);
+            $bStartLocal = Carbon::parse($inLocal->toDateString() . ' ' . $this->addBreakStart, $userTz);
+            $bEndLocal   = Carbon::parse($inLocal->toDateString() . ' ' . $this->addBreakEnd, $userTz);
+            if ($bEndLocal->gt($bStartLocal)) {
+                $bSecs = $bStartLocal->diffInSeconds($bEndLocal);
                 $breakMinutes = (int) ceil($bSecs / 60);
                 $breaks[] = [
-                    'start'   => $bStart->toIso8601String(),
-                    'end'     => $bEnd->toIso8601String(),
+                    'start'   => $bStartLocal->copy()->utc()->toIso8601String(),
+                    'end'     => $bEndLocal->copy()->utc()->toIso8601String(),
                     'seconds' => $bSecs,
                 ];
             }
         }
 
         $durationMinutes = max(0, $grossMinutes - $breakMinutes);
-        $targetDate = $in->toDateString();
+        $targetDate = $inLocal->toDateString();
         $hasDraftShift = \App\Models\Schedule::where('employee_id', $targetUser->id)
             ->whereDate('shift_date', $targetDate)
             ->where(function ($q) {
@@ -861,10 +871,10 @@ class Timesheets extends Component
                 return;
             }
 
-            if (!$matchingJobSchedule->coversTimeRange($in, $out, 30, 60)) {
+            if (!$matchingJobSchedule->coversTimeRange($inLocal, $outLocal, 30, 60)) {
                 $startFmt = $matchingJobSchedule->start_carbon ? $matchingJobSchedule->start_carbon->format('g:i A') : 'scheduled start';
                 $endFmt = $matchingJobSchedule->end_carbon ? $matchingJobSchedule->end_carbon->format('g:i A') : 'scheduled end';
-                $this->toast("Logged time for {$targetDate} ({$in->format('g:i A')} - {$out->format('g:i A')}) falls outside your scheduled shift ({$startFmt} - {$endFmt}).", 'error');
+                $this->toast("Logged time for {$targetDate} ({$inLocal->format('g:i A')} - {$outLocal->format('g:i A')}) falls outside your scheduled shift ({$startFmt} - {$endFmt}).", 'error');
                 return;
             }
         }
@@ -874,8 +884,9 @@ class Timesheets extends Component
             'assignment_id'    => $this->addAssignment,
             'task_id'          => $this->addTask,
             'hourly_rate'      => $hourlyRate,
-            'clock_in'         => $in,
-            'clock_out'        => $out,
+            'timezone'         => $userTz,
+            'clock_in'         => $inLocal->copy()->utc(),
+            'clock_out'        => $outLocal->copy()->utc(),
             'duration_minutes' => $durationMinutes,
             'break_minutes'    => $breakMinutes,
             'breaks'           => $breaks,
@@ -1160,10 +1171,14 @@ class Timesheets extends Component
 
     public function render()
     {
+        $user = Auth::user();
+        $userTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
         $weekStartDay = CompanySetting::getWeekStartDay();
-        $currentWeekStart = Carbon::now()->startOfWeek($weekStartDay);
-        $start = $currentWeekStart->copy()->addWeeks($this->weekOffset);
+        $currentWeekStart = Carbon::now($userTz)->startOfWeek($weekStartDay);
+        $start = $currentWeekStart->copy()->addWeeks($this->weekOffset)->startOfDay();
         $end   = $start->copy()->addDays(6)->endOfDay();
+        $startUtc = $start->copy()->utc();
+        $endUtc   = $end->copy()->utc();
 
         $days = collect();
         $cursor = $start->copy();
@@ -1188,12 +1203,11 @@ class Timesheets extends Component
             $dateRangeString = $start->format('M j') . ' – ' . $end->format('M j, Y');
         }
 
-        $user = Auth::user();
         $accessibleIds = $user->getAccessibleEmployeeIds();
 
         $query = TimeLog::with(['assignment','task','employee','logNotes','logAttachments'])
             ->where('status', '!=', 'break')
-            ->whereBetween('clock_in', [$start, $end])
+            ->whereBetween('clock_in', [$startUtc, $endUtc])
             ->orderBy('clock_in');
 
         if (!($this->includeDeleted && Auth::user()?->isSuperAdmin())) {
@@ -1213,7 +1227,7 @@ class Timesheets extends Component
         }
 
         $logs = $query->get();
-        $logsByDay = $logs->groupBy(fn ($l) => $l->clock_in->toDateString());
+        $logsByDay = $logs->groupBy(fn ($l) => $l->clock_in->copy()->setTimezone($userTz)->toDateString());
 
         $employeesQuery = \App\Models\User::notSuperAdmin()->orderBy('name');
         if ($accessibleIds !== null) {
@@ -1222,8 +1236,8 @@ class Timesheets extends Component
         $employees = $employeesQuery->get();
 
         // Calculate approved days count (out of 7)
-        $approvedDaysCount = $days->filter(function ($d) use ($logs) {
-            $dayLogs = $logs->filter(fn ($l) => $l->clock_in->toDateString() === $d->toDateString());
+        $approvedDaysCount = $days->filter(function ($d) use ($logs, $userTz) {
+            $dayLogs = $logs->filter(fn ($l) => $l->clock_in->copy()->setTimezone($userTz)->toDateString() === $d->toDateString());
             return $dayLogs->isNotEmpty() && $dayLogs->every(fn ($l) => (bool)$l->approved);
         })->count();
 
@@ -1278,7 +1292,7 @@ class Timesheets extends Component
                     ? $l->duration_minutes
                     : (int) ceil($l->netSeconds() / 60));
 
-                $rowLogsByDay = $empLogs->groupBy(fn ($l) => $l->clock_in->toDateString());
+                $rowLogsByDay = $empLogs->groupBy(fn ($l) => $l->clock_in->copy()->setTimezone($userTz)->toDateString());
 
                 $groupedRows->push([
                     'group_key'       => $groupKey,
@@ -1413,7 +1427,7 @@ class Timesheets extends Component
 
         foreach ($days as $d) {
             $dayStr = $d->toDateString();
-            $dayLogs = $logs->filter(fn ($l) => $l->clock_in->toDateString() === $dayStr);
+            $dayLogs = $logs->filter(fn ($l) => $l->clock_in->copy()->setTimezone($userTz)->toDateString() === $dayStr);
             $dayMins = $dayLogs->sum(fn ($l) => ($l->duration_minutes > 0 ? (int)$l->duration_minutes : (int) ceil($l->netSeconds() / 60)));
             $regularMinutesByDay[$dayStr] = $dayMins;
             $subtotalMinutesByDay[$dayStr] = $dayMins + ($ptoMinutesByDay[$dayStr] ?? 0);
@@ -1451,7 +1465,7 @@ class Timesheets extends Component
             'totalRegularMins'     => $totalRegularMins,
             'totalPtoMins'         => $totalPtoMins,
             'totalSubtotalMins'    => $totalSubtotalMins,
-            'todayKey'             => Carbon::now()->toDateString(),
+            'todayKey'             => Carbon::now($userTz)->toDateString(),
             'assignments'          => Assignment::ongoing()->orderBy('name')->get(),
             'tasks'                => Task::ongoing()->orderBy('name')->get(),
             'employees'            => $employees,

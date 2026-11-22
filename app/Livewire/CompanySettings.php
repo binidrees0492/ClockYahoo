@@ -167,8 +167,6 @@ class CompanySettings extends Component
         if ($canManage) {
             CompanySetting::set('company_name', $this->companyName);
             CompanySetting::set('server_timezone', $this->serverTimezone);
-            @date_default_timezone_set($this->serverTimezone);
-            config(['app.timezone' => $this->serverTimezone]);
         } else {
             // Keep existing values unchanged if not authorized
             $this->companyName    = CompanySetting::get('company_name', config('app.name', 'ClockVerse'));

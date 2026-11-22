@@ -113,4 +113,138 @@ class TimezoneTimerAccuracyTest extends TestCase
         // 05:00 NY = 09:00 UTC = 14:00 (2:00 PM) Karachi
         $this->assertStringContainsString('2:00 PM', $loadedLog['clock_in']);
     }
+
+    public function test_events_and_timestamps_are_stored_in_canonical_utc_and_displayed_in_user_timezone()
+    {
+        // 1. Setup company and user in Asia/Karachi (+05:00)
+        CompanySetting::set('server_timezone', 'UTC');
+
+        $employee = User::factory()->create([
+            'role'     => 'Employee',
+            'base_pay' => 25.00,
+            'timezone' => 'Asia/Karachi',
+        ]);
+        $this->actingAs($employee);
+
+        $job = Assignment::create(['name' => 'Alpha Tower', 'status' => 'active']);
+        $task = Task::create(['name' => 'Diagnostics', 'status' => 'active', 'hourly_rate' => 25.00]);
+
+        $employee->update([
+            'permissions' => [
+                'assigned_jobs'  => [$job->id],
+                'assigned_tasks' => [$task->id],
+            ],
+        ]);
+
+        // 2. Set current time to 15:00:00 Asia/Karachi (which is 10:00:00 UTC)
+        $tLocal = Carbon::parse('2026-10-20 15:00:00', 'Asia/Karachi');
+        Carbon::setTestNow($tLocal);
+
+        Livewire::test(TimeClock::class)
+            ->set('selectedAssignment', $job->id)
+            ->set('selectedTask', $task->id)
+            ->call('clockIn');
+
+        $log = TimeLog::where('employee_id', $employee->id)->whereNull('clock_out')->first();
+        $this->assertNotNull($log);
+
+        // 3. Raw database timestamp MUST be stored in canonical UTC (10:00:00)
+        $rawIn = \Illuminate\Support\Facades\DB::table('tbl_time_logging')->where('id', $log->id)->value('clock_in');
+        $this->assertStringContainsString('10:00:00', $rawIn);
+
+        // 4. TimeLog Eloquent helper returns correct local formatted time for Asia/Karachi (3:00 PM)
+        $this->assertEquals('3:00 PM', $log->formatIn('Asia/Karachi', 'g:i A'));
+        // And for an admin viewing from America/New_York (06:00 AM)
+        $this->assertEquals('6:00 AM', $log->formatIn('America/New_York', 'g:i A'));
+
+        // 5. Advance time by 45 minutes physical time (10:45:00 UTC)
+        $tLocal2 = Carbon::parse('2026-10-20 15:45:00', 'Asia/Karachi');
+        Carbon::setTestNow($tLocal2);
+
+        // Elapsed duration is counted directly from UTC timestamps
+        $this->assertEquals(2700, $log->grossSeconds());
+        $this->assertEquals(2700, $log->netSeconds());
+
+        // 6. Clock out
+        Livewire::test(TimeClock::class)->call('clockOut');
+        $log->refresh();
+
+        $rawOut = \Illuminate\Support\Facades\DB::table('tbl_time_logging')->where('id', $log->id)->value('clock_out');
+        $this->assertStringContainsString('10:45:00', $rawOut);
+        $this->assertEquals('3:45 PM', $log->formatOut('Asia/Karachi', 'g:i A'));
+    }
+
+    public function test_schedule_time_locking_respects_schedule_and_user_timezone()
+    {
+        CompanySetting::set('server_timezone', 'UTC');
+        CompanySetting::set('require_published_schedule', true);
+
+        // Employee operates in America/New_York (-04:00)
+        $employee = User::factory()->create([
+            'role'     => 'Employee',
+            'timezone' => 'America/New_York',
+        ]);
+        $this->actingAs($employee);
+
+        $job = Assignment::create(['name' => 'Downtown Project', 'status' => 'active']);
+        $task = Task::create(['name' => 'Site Audit', 'status' => 'active', 'hourly_rate' => 40.00]);
+
+        $employee->update([
+            'permissions' => [
+                'assigned_jobs'  => [$job->id],
+                'assigned_tasks' => [$task->id],
+            ],
+        ]);
+
+        // Scheduled shift: 2026-10-25 from 09:00:00 to 17:00:00 (New York time = 13:00:00 to 21:00:00 UTC)
+        $schedule = \App\Models\Schedule::create([
+            'employee_id'   => $employee->id,
+            'assignment_id' => $job->id,
+            'task_id'       => $task->id,
+            'shift_date'    => '2026-10-25',
+            'start_time'    => '09:00:00',
+            'end_time'      => '17:00:00',
+            'status'        => 'published',
+            'is_published'  => true,
+        ]);
+
+        // Case A: Employee attempts to clock in at 07:00:00 NY time (11:00:00 UTC)
+        // Outside 30 min grace period -> Should be locked!
+        $tooEarly = Carbon::parse('2026-10-25 07:00:00', 'America/New_York');
+        Carbon::setTestNow($tooEarly);
+
+        $this->assertFalse($schedule->coversTime(Carbon::now('UTC'), 30, 30));
+
+        Livewire::test(TimeClock::class)
+            ->set('selectedAssignment', $job->id)
+            ->set('selectedTask', $task->id)
+            ->call('clockIn');
+
+        $this->assertDatabaseMissing('tbl_time_logging', ['employee_id' => $employee->id]);
+
+        // Case B: Employee attempts to clock in at 08:35:00 NY time (12:35:00 UTC)
+        // Within 30 min grace period before shift -> Should be allowed!
+        $withinGrace = Carbon::parse('2026-10-25 08:35:00', 'America/New_York');
+        Carbon::setTestNow($withinGrace);
+
+        $this->assertTrue($schedule->coversTime(Carbon::now('UTC'), 30, 30));
+
+        Livewire::test(TimeClock::class)
+            ->set('selectedAssignment', $job->id)
+            ->set('selectedTask', $task->id)
+            ->call('clockIn');
+
+        $this->assertDatabaseHas('tbl_time_logging', [
+            'employee_id'   => $employee->id,
+            'assignment_id' => $job->id,
+            'task_id'       => $task->id,
+        ]);
+
+        $log = TimeLog::where('employee_id', $employee->id)->first();
+        // Clock in in UTC should be 12:35:00
+        $this->assertEquals('12:35:00', $log->clock_in->toTimeString());
+        // Clock in in NY should be 08:35:00
+        $this->assertEquals('08:35:00', $log->getClockInInTimezone('America/New_York')->toTimeString());
+    }
 }
+

@@ -46,15 +46,11 @@ class CompanySetting extends Model
             ['value' => (string) $value]
         );
 
-        if ($key === 'server_timezone' && is_string($value) && !empty($value)) {
-            @date_default_timezone_set($value);
-            config(['app.timezone' => $value]);
-        }
     }
 
     public static function getServerTimezone(): string
     {
-        return static::get('server_timezone', config('app.timezone', 'UTC'));
+        return static::get('server_timezone', 'UTC') ?: 'UTC';
     }
 
     public static function getLocationTrackingPolicy(): string

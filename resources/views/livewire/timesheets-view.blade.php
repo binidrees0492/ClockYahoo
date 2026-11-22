@@ -294,8 +294,8 @@
                                                 : (int) ceil($entry->netSeconds() / 60);
                                             $isManual = $entry->isManual();
                                             $breakMins = (int) ($entry->break_minutes ?: 0);
-                                            $inFmt = $entry->clock_in ? $entry->clock_in->format('g:i A') : '—';
-                                            $outFmt = $entry->clock_out ? $entry->clock_out->format('g:i A') : 'Running';
+                                            $inFmt = $entry->formatIn();
+                                            $outFmt = $entry->formatOut();
                                         @endphp
                                         <div
                                             wire:click="openDetail({{ $entry->id }})"

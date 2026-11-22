@@ -212,50 +212,58 @@ class TimeLog extends Model
 
     public function getLogTimezone(): string
     {
-        return $this->timezone ?: \App\Models\CompanySetting::getServerTimezone() ?: config('app.timezone', 'America/New_York');
+        return $this->timezone ?: (auth()->user()?->getTimezone() ?: (\App\Models\CompanySetting::getServerTimezone() ?: 'UTC'));
     }
 
     public function getClockInCarbon(): ?Carbon
     {
         if (!$this->clock_in) return null;
-        $raw = $this->getRawOriginal('clock_in') ?: ($this->attributes['clock_in'] ?? null);
-        if ($raw) {
-            try {
-                return Carbon::parse($raw, $this->getLogTimezone());
-            } catch (\Throwable $e) {}
-        }
-        return $this->clock_in;
+        return $this->clock_in->copy()->utc();
     }
 
     public function getClockOutCarbon(): ?Carbon
     {
         if (!$this->clock_out) return null;
-        $raw = $this->getRawOriginal('clock_out') ?: ($this->attributes['clock_out'] ?? null);
-        if ($raw) {
-            try {
-                return Carbon::parse($raw, $this->getLogTimezone());
-            } catch (\Throwable $e) {}
-        }
-        return $this->clock_out;
+        return $this->clock_out->copy()->utc();
     }
 
     public function getBreakStartedAtCarbon(): ?Carbon
     {
         if (!$this->break_started_at) return null;
-        $raw = $this->getRawOriginal('break_started_at') ?: ($this->attributes['break_started_at'] ?? null);
-        if ($raw) {
-            try {
-                return Carbon::parse($raw, $this->getLogTimezone());
-            } catch (\Throwable $e) {}
-        }
-        return $this->break_started_at;
+        return $this->break_started_at->copy()->utc();
+    }
+
+    public function getClockInInTimezone(?string $tz = null): ?Carbon
+    {
+        if (!$this->clock_in) return null;
+        $tz = $tz ?: (auth()->user()?->getTimezone() ?: $this->getLogTimezone());
+        return $this->clock_in->copy()->setTimezone($tz);
+    }
+
+    public function getClockOutInTimezone(?string $tz = null): ?Carbon
+    {
+        if (!$this->clock_out) return null;
+        $tz = $tz ?: (auth()->user()?->getTimezone() ?: $this->getLogTimezone());
+        return $this->clock_out->copy()->setTimezone($tz);
+    }
+
+    public function formatIn(?string $tz = null, string $format = 'g:i A'): string
+    {
+        $in = $this->getClockInInTimezone($tz);
+        return $in ? $in->format($format) : '—';
+    }
+
+    public function formatOut(?string $tz = null, string $format = 'g:i A'): string
+    {
+        $out = $this->getClockOutInTimezone($tz);
+        return $out ? $out->format($format) : ($this->clock_out ? '—' : 'Running');
     }
 
     public function grossSeconds(): int
     {
         $start = $this->getClockInCarbon();
         if (!$start) return 0;
-        $end = $this->clock_out ? $this->getClockOutCarbon() : Carbon::now($this->getLogTimezone());
+        $end = $this->clock_out ? $this->getClockOutCarbon() : Carbon::now('UTC');
         if (!$end) return 0;
         return max(0, $end->getTimestamp() - $start->getTimestamp());
     }
@@ -267,7 +275,7 @@ class TimeLog extends Model
         }
         $start = $this->getBreakStartedAtCarbon();
         if (!$start) return 0;
-        return max(0, Carbon::now($this->getLogTimezone())->getTimestamp() - $start->getTimestamp());
+        return max(0, Carbon::now('UTC')->getTimestamp() - $start->getTimestamp());
     }
 
     public function completedBreakSeconds(): int
@@ -377,7 +385,7 @@ class TimeLog extends Model
     {
         if ($this->isOnBreak()) {
             $breakStart = $this->getBreakStartedAtCarbon();
-            $now        = Carbon::now($this->getLogTimezone());
+            $now        = Carbon::now('UTC');
             $diffSecs   = $breakStart ? abs($now->getTimestamp() - $breakStart->getTimestamp()) : 0;
             $breaks     = $this->breaks ?? [];
             $breaks[]   = [
@@ -393,10 +401,10 @@ class TimeLog extends Model
 
         // Ensure this log has a shift_id before chaining
         if (empty($this->shift_id)) {
-            $this->shift_id = 'shift_' . $this->employee_id . '_' . $this->clock_in->timestamp;
+            $this->shift_id = 'shift_' . $this->employee_id . '_' . ($this->clock_in ? $this->clock_in->timestamp : time());
         }
 
-        $now = Carbon::now($this->getLogTimezone());
+        $now = Carbon::now('UTC');
         $this->clock_out        = $now;
         $this->duration_minutes = (int) ceil($this->netSeconds() / 60);
         $this->status           = 'switched';

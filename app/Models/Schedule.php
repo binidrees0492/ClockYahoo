@@ -71,6 +71,11 @@ class Schedule extends Model
         return !$this->isPublished();
     }
 
+    public function getScheduleTimezone(): string
+    {
+        return $this->employee?->timezone ?: \App\Models\CompanySetting::getServerTimezone();
+    }
+
     public function getStartCarbonAttribute(): ?\Carbon\Carbon
     {
         if (!$this->shift_date || !$this->start_time) {
@@ -83,7 +88,7 @@ class Schedule extends Model
             ? substr($this->start_time, 0, 8)
             : (is_object($this->start_time) && method_exists($this->start_time, 'format') ? $this->start_time->format('H:i:s') : (string) $this->start_time);
         try {
-            return \Carbon\Carbon::parse($dateStr . ' ' . $timeStr);
+            return \Carbon\Carbon::parse($dateStr . ' ' . $timeStr, $this->getScheduleTimezone());
         } catch (\Throwable $e) {
             return null;
         }
@@ -101,7 +106,7 @@ class Schedule extends Model
             ? substr($this->end_time, 0, 8)
             : (is_object($this->end_time) && method_exists($this->end_time, 'format') ? $this->end_time->format('H:i:s') : (string) $this->end_time);
         try {
-            $end = \Carbon\Carbon::parse($dateStr . ' ' . $timeStr);
+            $end = \Carbon\Carbon::parse($dateStr . ' ' . $timeStr, $this->getScheduleTimezone());
             $start = $this->start_carbon;
             if ($start && $end->lt($start)) {
                 $end->addDay();
@@ -114,9 +119,23 @@ class Schedule extends Model
 
     public function coversTime($datetime = null, int $graceBefore = 30, int $graceAfter = 30): bool
     {
-        $dt = $datetime
-            ? ($datetime instanceof \Carbon\Carbon ? $datetime->copy() : \Carbon\Carbon::parse($datetime))
-            : \Carbon\Carbon::now();
+        $tz = $this->getScheduleTimezone();
+
+        if ($datetime instanceof \Carbon\Carbon) {
+            $dtLocal = $datetime->copy()->setTimezone($tz);
+        } elseif (is_string($datetime)) {
+            try {
+                if (preg_match('/(Z|[+-]\d{2}:?\d{2})$/i', trim($datetime))) {
+                    $dtLocal = \Carbon\Carbon::parse($datetime)->setTimezone($tz);
+                } else {
+                    $dtLocal = \Carbon\Carbon::parse($datetime, $tz);
+                }
+            } catch (\Throwable $e) {
+                $dtLocal = \Carbon\Carbon::now('UTC')->setTimezone($tz);
+            }
+        } else {
+            $dtLocal = \Carbon\Carbon::now('UTC')->setTimezone($tz);
+        }
 
         $shiftDateStr = $this->shift_date instanceof \Carbon\Carbon
             ? $this->shift_date->toDateString()
@@ -126,25 +145,40 @@ class Schedule extends Model
         $end = $this->end_carbon;
 
         if (!$start || !$end) {
-            return $dt->toDateString() === $shiftDateStr;
+            return $dtLocal->toDateString() === $shiftDateStr;
         }
 
         $validStart = $start->copy()->subMinutes($graceBefore);
         $validEnd = $end->copy()->addMinutes($graceAfter);
 
-        return $dt->betweenIncluded($validStart, $validEnd);
+        return $dtLocal->betweenIncluded($validStart, $validEnd);
     }
 
     public function coversTimeRange($clockIn, $clockOut, int $graceBeforeMinutes = 30, int $graceAfterMinutes = 60): bool
     {
-        $in = $clockIn instanceof \Carbon\Carbon ? $clockIn->copy() : \Carbon\Carbon::parse($clockIn);
-        $out = $clockOut instanceof \Carbon\Carbon ? $clockOut->copy() : \Carbon\Carbon::parse($clockOut);
+        $tz = $this->getScheduleTimezone();
+
+        $parseLocal = function ($dtVal) use ($tz) {
+            if ($dtVal instanceof \Carbon\Carbon) {
+                return $dtVal->copy()->setTimezone($tz);
+            }
+            if (is_string($dtVal)) {
+                if (preg_match('/(Z|[+-]\d{2}:?\d{2})$/i', trim($dtVal))) {
+                    return \Carbon\Carbon::parse($dtVal)->setTimezone($tz);
+                }
+                return \Carbon\Carbon::parse($dtVal, $tz);
+            }
+            return \Carbon\Carbon::parse($dtVal)->setTimezone($tz);
+        };
+
+        $inLocal = $parseLocal($clockIn);
+        $outLocal = $parseLocal($clockOut);
 
         $shiftDateStr = $this->shift_date instanceof \Carbon\Carbon
             ? $this->shift_date->toDateString()
             : (string) $this->shift_date;
 
-        if ($in->toDateString() !== $shiftDateStr) {
+        if ($inLocal->toDateString() !== $shiftDateStr) {
             return false;
         }
 
@@ -158,7 +192,7 @@ class Schedule extends Model
         $validStart = $start->copy()->subMinutes($graceBeforeMinutes);
         $validEnd = $end->copy()->addMinutes($graceAfterMinutes);
 
-        return $in->gte($validStart) && $out->lte($validEnd);
+        return $inLocal->gte($validStart) && $outLocal->lte($validEnd);
     }
 
     public function employee()
