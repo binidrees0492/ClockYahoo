@@ -10,7 +10,7 @@
         $activeTheme = Auth::check() && Auth::user()->theme_preference
             ? Auth::user()->theme_preference
             : $companyThemeSetting;
-        $companyFontSetting = \App\Models\CompanySetting::get('company_font', 'aptos');
+        $companyFontSetting = \App\Models\CompanySetting::get('company_font', 'opensans');
         $activeFont = Auth::check() && Auth::user()->font_preference
             ? Auth::user()->font_preference
             : $companyFontSetting;
@@ -112,16 +112,20 @@
             transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
         }
         input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
-            border-color: #005a9c !important;
-            box-shadow: 0 0 0 3px rgba(0, 90, 156, 0.2) !important;
+            border-color: #005088 !important;
+            box-shadow: 0 0 0 3px rgba(0, 80, 136, 0.2) !important;
             outline: none !important;
         }
 
-        .bg-cs-blue     { background-color: #005a9c; }
-        .bg-cs-dark     { background-color: #003d6b; }
-        .text-cs-blue   { color: #005a9c; }
-        .border-cs-blue { border-color: #005a9c; }
-        .bg-cs-today    { background-color: #fdf6e3; }
+        .bg-cs-blue      { background-color: #005088; }
+        .bg-cs-dark      { background-color: #003e6b; }
+        .text-cs-blue    { color: #005088; }
+        .border-cs-blue  { border-color: #005088; }
+        .text-cs-orange  { color: #f26522; }
+        .border-cs-orange { border-color: #f26522; }
+        .bg-cs-orange    { background-color: #f26522; }
+        .bg-cs-pill-blue { background-color: #0077c5; }
+        .bg-cs-today     { background-color: #fdf6e3; }
 
         .nav-dropdown { position: relative; }
         .nav-dropdown > .dd-menu {
@@ -147,7 +151,7 @@
             font-size: 10px;
             letter-spacing: 0.08em;
             font-weight: 700;
-            color: #005a9c;
+            color: #005088;
             text-transform: uppercase;
         }
         .dd-link {
@@ -162,7 +166,7 @@
         }
         .dd-link:hover {
             background: #eaf3fb;
-            color: #005a9c;
+            color: #005088;
             padding-left: 20px;
         }
         .dd-divider {
@@ -671,7 +675,7 @@
 
     @livewireStyles
 </head>
-<body class="base-{{ $baseTheme }} {{ $isModern ? 'base-modern modern-layout' : 'base-classic' }} theme-{{ Str::slug($activeTheme) }} bg-gray-50 text-gray-800 antialiased min-h-screen flex flex-col"
+<body class="base-{{ $baseTheme }} {{ $isModern ? 'base-modern modern-layout' : 'base-classic' }} theme-{{ Str::slug($activeTheme) }} bg-[#f4f6f8] text-gray-800 antialiased min-h-screen flex flex-col"
       x-data="{ mobileDrawerOpen: false, deferredPrompt: null, showInstallBtn: false, showHelpModal: false, showSearchModal: false, searchQuery: '' }"
       @keydown.window.ctrl.k.prevent="showSearchModal = true"
       @keydown.window.cmd.k.prevent="showSearchModal = true"
@@ -691,30 +695,35 @@
         }
       ">
 
-{{-- Top Header / Navigation --}}
-<nav class="bg-cs-blue text-white shadow-md sticky top-0 z-40">
-    <div class="w-full px-4">
+{{-- Top Header / Navigation (ClockShark Authentic White Header) --}}
+<nav class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
+    <div class="w-full px-4 sm:px-6">
         <div class="flex justify-between h-14 items-center">
 
             {{-- Brand & Desktop Links --}}
-            <div class="flex items-center space-x-6 lg:space-x-8">
-                <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5 group">
+            <div class="flex items-center space-x-3 lg:space-x-6 h-14">
+                <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2 group py-1 shrink-0">
                     @if($logoUrl)
-                        <img src="{{ $logoUrl }}" alt="{{ $companyName }}" class="h-8 max-w-[130px] object-contain rounded-lg bg-white/15 p-0.5 border border-white/20 shadow-xs" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
-                        <div class="w-8 h-8 rounded-xl {{ $isModern ? 'modern-brand-badge' : 'bg-amber-500' }} items-center justify-center text-white font-black text-sm shadow hidden">
-                            <i class="fa-solid fa-bolt-lightning text-xs"></i>
+                        <img src="{{ $logoUrl }}" alt="{{ $companyName }}" class="h-8 max-w-[140px] object-contain" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+                        <div class="items-center gap-0.5 hidden">
+                            @if(strtolower(trim($companyName)) === 'clockshark' || strtolower(trim($companyName)) === 'clockverse' || strtolower(trim($companyName)) === 'clockyahoo')
+                                <span class="text-xl font-bold tracking-tight text-[#005088]">Clock</span><span class="text-xl font-black italic tracking-tight text-[#0077c5]">Shark</span>
+                            @else
+                                <span class="text-xl font-bold tracking-tight text-[#005088]">{{ $companyName }}</span>
+                            @endif
                         </div>
                     @else
-                        <div class="w-8 h-8 rounded-xl {{ $isModern ? 'modern-brand-badge' : 'bg-amber-500' }} flex items-center justify-center text-white font-black text-sm shadow">
-                            <i class="fa-solid fa-bolt-lightning text-xs"></i>
+                        <div class="flex items-center gap-0.5">
+                            @if(strtolower(trim($companyName)) === 'clockshark' || strtolower(trim($companyName)) === 'clockverse' || strtolower(trim($companyName)) === 'clockyahoo')
+                                <span class="text-xl font-bold tracking-tight text-[#005088]">Clock</span><span class="text-xl font-black italic tracking-tight text-[#0077c5]">Shark</span>
+                            @else
+                                <span class="text-xl font-bold tracking-tight text-[#005088]">{{ $companyName }}</span>
+                            @endif
                         </div>
                     @endif
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-xl font-black tracking-tight text-white group-hover:text-blue-100 transition">{{ $companyName }}</span>
-                    </div>
                 </a>
 
-                <div class="hidden md:flex items-center space-x-4 lg:space-x-6 text-xs font-semibold uppercase tracking-wider">
+                <div class="hidden md:flex items-center space-x-1 lg:space-x-2 text-xs font-semibold uppercase tracking-wider h-14">
 
                     <!-- 1. Time Dropdown -->
                     @php
@@ -727,10 +736,9 @@
                     @endphp
 
                     @if($hasTimeAccess)
-                        <div class="nav-dropdown">
+                        <div class="nav-dropdown h-14 flex items-center">
                             <a href="{{ route('dashboard') }}" wire:navigate
-                               class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition {{ request()->routeIs('dashboard') || request()->routeIs('timesheets.*') || request()->routeIs('timeoff.*') || request()->routeIs('timeclock.*') ? ($isModern ? 'nav-pill-link active-link' : 'border-b-2 border-orange-400 font-bold') : ($isModern ? 'nav-pill-link' : '') }}">
-                                @if($isModern) <i class="fa-solid fa-clock text-xs text-sky-400"></i> @endif
+                               class="h-14 flex items-center gap-1 px-2.5 transition select-none {{ request()->routeIs('dashboard') || request()->routeIs('timesheets.*') || request()->routeIs('timeoff.*') || request()->routeIs('timeclock.*') ? 'border-b-[3px] border-[#f26522] text-[#f26522] font-black' : 'border-b-[3px] border-transparent text-gray-700 hover:text-[#005088] font-bold' }}">
                                 <span>Time</span> <span class="text-[8px]">&#9660;</span>
                             </a>
                             <div class="dd-menu">
@@ -738,13 +746,11 @@
                                     <div class="dd-group-title">Timesheets</div>
                                     @if($showTimesheetsView)
                                         <a href="{{ route('timesheets.view') }}" wire:navigate class="dd-link">
-                                            @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-table-list"></i></span> @endif
                                             <span>View Timesheets</span>
                                         </a>
                                     @endif
                                     @if($showTimesheetsApprove)
                                         <a href="{{ route('timesheets.approve') }}" wire:navigate class="dd-link">
-                                            @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-check-double"></i></span> @endif
                                             <span>Approve Timesheets</span>
                                         </a>
                                     @endif
@@ -755,13 +761,11 @@
                                     <div class="dd-group-title">Time Off</div>
                                     @if($showTimeoffPolicies)
                                         <a href="{{ route('timeoff.policies') }}" wire:navigate class="dd-link">
-                                            @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-scale-balanced"></i></span> @endif
                                             <span>Policies</span>
                                         </a>
                                     @endif
                                     @if($showTimeoffRequests)
                                         <a href="{{ route('timeoff.requests') }}" wire:navigate class="dd-link">
-                                            @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-plane-departure"></i></span> @endif
                                             <span>Requests</span>
                                         </a>
                                     @endif
@@ -770,7 +774,6 @@
                                 @if($showTimeClock)
                                     <div class="dd-divider"></div>
                                     <a href="{{ route('dashboard') }}" wire:navigate class="dd-link font-semibold">
-                                        @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-stopwatch"></i></span> @endif
                                         <span>My Time Clock</span>
                                     </a>
                                 @endif
@@ -781,8 +784,7 @@
                     <!-- 2. Schedules -->
                     @if(\App\Models\CompanySetting::isPageActive('schedules') && Auth::user()->canAccessSchedules())
                         <a href="{{ route('schedules') }}" wire:navigate
-                           class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition {{ request()->routeIs('schedules') ? ($isModern ? 'nav-pill-link active-link' : 'border-b-2 border-orange-400 font-bold') : ($isModern ? 'nav-pill-link' : '') }}">
-                            @if($isModern) <i class="fa-solid fa-calendar-days text-xs text-indigo-400"></i> @endif
+                           class="h-14 flex items-center gap-1 px-2.5 transition select-none {{ request()->routeIs('schedules*') ? 'border-b-[3px] border-[#f26522] text-[#f26522] font-black' : 'border-b-[3px] border-transparent text-gray-700 hover:text-[#005088] font-bold' }}">
                             <span>Schedules</span>
                         </a>
                     @endif
@@ -798,39 +800,33 @@
                     @endphp
 
                     @if($hasWorkAccess)
-                        <div class="nav-dropdown">
-                            <a href="#" class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition {{ request()->routeIs('work.*') ? ($isModern ? 'nav-pill-link active-link' : 'border-b-2 border-orange-400 font-bold') : ($isModern ? 'nav-pill-link' : '') }}">
-                                @if($isModern) <i class="fa-solid fa-briefcase text-xs text-amber-400"></i> @endif
+                        <div class="nav-dropdown h-14 flex items-center">
+                            <a href="#" class="h-14 flex items-center gap-1 px-2.5 transition select-none {{ request()->routeIs('work.*') ? 'border-b-[3px] border-[#f26522] text-[#f26522] font-black' : 'border-b-[3px] border-transparent text-gray-700 hover:text-[#005088] font-bold' }}">
                                 <span>Work</span> <span class="text-[8px]">&#9660;</span>
                             </a>
                             <div class="dd-menu">
                                 @if($canCustomers)
                                     <a href="{{ route('work.customers') }}" wire:navigate class="dd-link">
-                                        @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-building-user"></i></span> @endif
                                         <span>Customers</span>
                                     </a>
                                 @endif
                                 @if($canJobs)
                                     <a href="{{ route('work.jobs') }}" wire:navigate class="dd-link">
-                                        @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-briefcase"></i></span> @endif
                                         <span>Jobs</span>
                                     </a>
                                 @endif
                                 @if($canTasks)
                                     <a href="{{ route('work.tasks') }}" wire:navigate class="dd-link">
-                                        @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-list-check"></i></span> @endif
                                         <span>Tasks</span>
                                     </a>
                                 @endif
                                 @if($canQuotes)
                                     <a href="{{ route('work.quotes') }}" wire:navigate class="dd-link">
-                                        @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-file-invoice-dollar"></i></span> @endif
                                         <span>Quotes</span>
                                     </a>
                                 @endif
                                 @if($canInvoices)
                                     <a href="{{ route('work.invoices') }}" wire:navigate class="dd-link">
-                                        @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-receipt"></i></span> @endif
                                         <span>Invoices</span>
                                     </a>
                                 @endif
@@ -841,8 +837,7 @@
                     <!-- 4. Reports -->
                     @if(\App\Models\CompanySetting::isPageActive('reports') && Auth::user()->canViewReports())
                         <a href="{{ route('reports') }}" wire:navigate
-                           class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition {{ request()->routeIs('reports*') ? ($isModern ? 'nav-pill-link active-link' : 'border-b-2 border-orange-400 font-bold') : ($isModern ? 'nav-pill-link' : '') }}">
-                            @if($isModern) <i class="fa-solid fa-chart-pie text-xs text-emerald-400"></i> @endif
+                           class="h-14 flex items-center gap-1 px-2.5 transition select-none {{ request()->routeIs('reports*') ? 'border-b-[3px] border-[#f26522] text-[#f26522] font-black' : 'border-b-[3px] border-transparent text-gray-700 hover:text-[#005088] font-bold' }}">
                             <span>Reports</span>
                         </a>
                     @endif
@@ -857,10 +852,9 @@
                             $canAdminAudit = \App\Models\CompanySetting::isPageActive('admin_audit_log');
                             $hasPeopleGroup = $canAdminEmployees || $canAdminDepartments || $canAdminLocations;
                         @endphp
-                        <div class="nav-dropdown">
+                        <div class="nav-dropdown h-14 flex items-center">
                             <a href="{{ route('admin.employees') }}" wire:navigate
-                               class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition {{ request()->routeIs('admin.employees') || request()->routeIs('admin.departments') || request()->routeIs('admin.locations') || request()->routeIs('admin.audit-log') ? ($isModern ? 'nav-pill-link active-link' : 'border-b-2 border-orange-400 font-bold') : ($isModern ? 'nav-pill-link' : '') }}">
-                                @if($isModern) <i class="fa-solid fa-users-gear text-xs text-purple-400"></i> @endif
+                               class="h-14 flex items-center gap-1 px-2.5 transition select-none {{ request()->routeIs('admin.employees') || request()->routeIs('admin.departments') || request()->routeIs('admin.locations') || request()->routeIs('admin.audit-log') || request()->routeIs('admin.company-settings') ? 'border-b-[3px] border-[#f26522] text-[#f26522] font-black' : 'border-b-[3px] border-transparent text-gray-700 hover:text-[#005088] font-bold' }}">
                                 <span>Admin</span> <span class="text-[8px]">&#9660;</span>
                             </a>
                             <div class="dd-menu">
@@ -868,19 +862,16 @@
                                     <div class="dd-group-title">People</div>
                                     @if($canAdminEmployees)
                                         <a href="{{ route('admin.employees') }}" wire:navigate class="dd-link">
-                                            @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-users"></i></span> @endif
                                             <span>Employees</span>
                                         </a>
                                     @endif
                                     @if($canAdminDepartments)
                                         <a href="{{ route('admin.departments') }}" wire:navigate class="dd-link">
-                                            @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-sitemap"></i></span> @endif
                                             <span>Departments</span>
                                         </a>
                                     @endif
                                     @if($canAdminLocations)
                                         <a href="{{ route('admin.locations') }}" wire:navigate class="dd-link">
-                                            @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-location-dot"></i></span> @endif
                                             <span>Locations</span>
                                         </a>
                                     @endif
@@ -889,23 +880,19 @@
 
                                 <div class="dd-group-title">Settings</div>
                                 <a href="{{ route('admin.company-settings') }}" wire:navigate class="dd-link">
-                                    @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-sliders"></i></span> @endif
-                                    <span>Company & Base Theme</span>
+                                    <span>Company Settings</span>
                                 </a>
                                 @if($canAdminPto)
                                     <a href="{{ route('timeoff.policies') }}" wire:navigate class="dd-link">
-                                        @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-scale-balanced"></i></span> @endif
                                         <span>Time Off Policies</span>
                                     </a>
                                 @endif
-                                <a href="{{ route('admin.company-settings') }}" wire:navigate class="dd-link">
-                                    @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-bell"></i></span> @endif
+                                <a href="{{ route('notification.settings') }}" wire:navigate class="dd-link">
                                     <span>Alerts and Reminders</span>
                                 </a>
 
                                 <div class="dd-divider"></div>
                                 <a href="{{ route('admin.audit-log') }}" wire:navigate class="dd-link">
-                                    @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-clock-rotate-left"></i></span> @endif
                                     <span>Audit Log</span>
                                 </a>
                             </div>
@@ -915,17 +902,16 @@
                     <!-- 6. Map -->
                     @if(\App\Models\CompanySetting::isPageActive('map') && Auth::user()->canViewMap())
                         <a href="{{ route('map') }}" wire:navigate
-                           class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition {{ request()->routeIs('map') ? ($isModern ? 'nav-pill-link active-link' : 'border-b-2 border-orange-400 font-bold') : ($isModern ? 'nav-pill-link' : '') }}">
-                            @if($isModern) <i class="fa-solid fa-map-location-dot text-xs text-rose-400"></i> @endif
+                           class="h-14 flex items-center gap-1 px-2.5 transition select-none {{ request()->routeIs('map*') ? 'border-b-[3px] border-[#f26522] text-[#f26522] font-black' : 'border-b-[3px] border-transparent text-gray-700 hover:text-[#005088] font-bold' }}">
                             <span>Map</span>
                         </a>
                     @endif
 
                     <!-- 7. Super Admin Dedicated Module (Exclusively for Super Admins) -->
                     @if(Auth::user()->isSuperAdmin())
-                        <div class="nav-dropdown">
-                            <a href="#" class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition text-amber-300 font-bold {{ request()->routeIs('executive.*') || request()->routeIs('mail.*') || request()->routeIs('notifications.log') || request()->routeIs('webmail') || request()->routeIs('admin.access-management') ? 'border-b-2 border-amber-400 font-bold' : '' }}">
-                                <span class="bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px] text-amber-300 font-extrabold tracking-wide uppercase mr-0.5">Super</span>
+                        <div class="nav-dropdown h-14 flex items-center">
+                            <a href="#" class="h-14 flex items-center gap-1 px-2.5 transition select-none {{ request()->routeIs('executive.*') || request()->routeIs('mail.*') || request()->routeIs('notifications.log') || request()->routeIs('webmail') || request()->routeIs('admin.access-management') || request()->routeIs('admin.inactive-records') || request()->routeIs('admin.data-shedding') ? 'border-b-[3px] border-[#f26522] text-[#f26522] font-black' : 'border-b-[3px] border-transparent text-amber-700 hover:text-[#005088] font-bold' }}">
+                                <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide uppercase mr-0.5">Super</span>
                                 <span>Admin</span> <span class="text-[8px]">&#9660;</span>
                             </a>
                             <div class="dd-menu w-64 shadow-2xl">
@@ -980,12 +966,18 @@
             </div>
 
             {{-- Right Header Elements (Matches ClockShark layout) --}}
-            <div class="flex items-center space-x-2 sm:space-x-3 text-sm">
+            <div class="flex items-center space-x-2 sm:space-x-3 text-sm h-14">
+
+                <!-- Get the Mobile App link -->
+                <a href="https://www.clockshark.com/mobile-app" target="_blank"
+                   class="hidden xl:inline-flex items-center text-xs font-semibold text-[#0077c5] hover:text-[#005088] hover:underline mr-1 transition">
+                    Get the Mobile App
+                </a>
 
                 <!-- Install PWA Button (Shown when installable) -->
                 <button x-show="showInstallBtn"
                         @click="if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt = null; showInstallBtn = false; }); }"
-                        class="hidden md:inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white text-xs px-2.5 py-1 rounded font-semibold shadow transition"
+                        class="hidden md:inline-flex items-center gap-1 bg-[#0077c5] hover:bg-[#005088] text-white text-xs px-2.5 py-1 rounded font-semibold shadow-xs transition"
                         title="Install app on your device">
                     <span>&#8681;</span> Install App
                 </button>
@@ -1002,7 +994,7 @@
                 @endphp
                 @if($hasAnyNewAction)
                     <div class="nav-dropdown hidden sm:block">
-                        <button type="button" class="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold text-white bg-[#1f76d1] hover:bg-blue-600 shadow-xs transition">
+                        <button type="button" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#0077c5] hover:bg-[#005fa3] shadow-xs transition select-none">
                             + New
                         </button>
                         <div class="dd-menu w-44 shadow-xl">
@@ -1040,17 +1032,13 @@
                     </div>
                 @endif
 
-                <!-- 1. Search Icon / Quick Search Pill -->
+                <!-- 1. Search Icon -->
                 <button @click="showSearchModal = true" type="button"
-                        class="{{ $isModern ? 'px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/15 rounded-full text-slate-200 text-xs flex items-center gap-1.5 shadow-xs transition' : 'p-2 text-gray-300 hover:text-white rounded-full hover:bg-white/10 transition focus:outline-none' }}"
+                        class="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition focus:outline-none flex items-center justify-center"
                         title="Quick Search (Ctrl + K)">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    @if($isModern)
-                        <span class="hidden lg:inline text-[11px] text-slate-300 font-medium">Search...</span>
-                        <kbd class="hidden lg:inline text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/15 text-slate-200 border border-white/20">⌘K</kbd>
-                    @endif
                 </button>
 
                 <!-- 2. Notification Bell Livewire Component -->
@@ -1058,7 +1046,7 @@
 
                 <!-- 3. Help / Support Icon Button -->
                 <button @click="showHelpModal = true" type="button"
-                        class="p-2 text-gray-300 hover:text-white rounded-full hover:bg-white/10 transition focus:outline-none"
+                        class="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition focus:outline-none flex items-center justify-center"
                         title="Help & Shortcuts">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1067,8 +1055,8 @@
 
                 <!-- 4. User Profile (Avatar circle + Name + Role underneath) -->
                 <div class="nav-dropdown">
-                    <div class="flex items-center gap-2 cursor-pointer py-1 pl-1 pr-1.5 rounded-full hover:bg-white/10 transition">
-                        <div class="w-8 h-8 rounded-full ring-2 ring-sky-400/60 overflow-hidden bg-[#1f76d1] flex items-center justify-center font-bold text-xs text-white shadow">
+                    <div class="flex items-center gap-2 cursor-pointer py-1 pl-1 pr-1.5 rounded-full hover:bg-gray-100 transition">
+                        <div class="w-8 h-8 rounded-full ring-2 ring-gray-200 overflow-hidden bg-[#005088] flex items-center justify-center font-bold text-xs text-white shadow-2xs">
                             @if(Auth::user()->avatar_url)
                                 <img src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}" class="w-full h-full object-cover" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='inline';">
                                 <span class="hidden">{{ Auth::user()->initials }}</span>
@@ -1077,8 +1065,8 @@
                             @endif
                         </div>
                         <div class="text-left hidden sm:block leading-tight">
-                            <div class="text-xs font-bold text-white tracking-tight">{{ Auth::user()->name }}</div>
-                            <div class="text-[10px] text-gray-300 font-medium leading-none mt-0.5">
+                            <div class="text-xs font-bold text-gray-800 tracking-tight">{{ Auth::user()->name }}</div>
+                            <div class="text-[10px] text-gray-500 font-medium leading-none mt-0.5">
                                 {{ Auth::user()->isAdmin() ? 'Super Admin' : (Auth::user()->role ?: 'Employee') }}
                             </div>
                         </div>
@@ -1101,7 +1089,7 @@
                         </a>
                         @if(Auth::user()->canAccessAdmin() || Auth::user()->isManager())
                             <a href="{{ route('notification.settings') }}" wire:navigate class="dd-link flex items-center gap-2">
-                                <i class="fa-solid fa-bell-concierge text-xs text-[#005a9c]"></i> Notification Management
+                                <i class="fa-solid fa-bell-concierge text-xs text-[#005088]"></i> Notification Management
                             </a>
                         @endif
                         <div class="dd-divider"></div>
@@ -1116,7 +1104,7 @@
 
                 <!-- Mobile Hamburger Button -->
                 <button type="button" @click="mobileDrawerOpen = true"
-                        class="md:hidden p-1.5 text-gray-200 hover:text-white rounded hover:bg-white/10 focus:outline-none"
+                        class="md:hidden p-1.5 text-gray-600 hover:text-gray-900 rounded hover:bg-gray-100 focus:outline-none"
                         title="Open Menu">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
@@ -1170,7 +1158,7 @@
              class="w-screen max-w-xs bg-white shadow-2xl flex flex-col">
 
             <!-- Drawer Header -->
-            <div class="p-4 bg-[#005a9c] text-white flex justify-between items-center">
+            <div class="p-4 bg-[#005088] text-white flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     @if($logoUrl)
                         <img src="{{ $logoUrl }}" alt="{{ $companyName }}" class="h-7 max-w-[120px] object-contain rounded bg-white/20 p-0.5" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
@@ -1189,7 +1177,7 @@
 
             <!-- User Info Card -->
             <div class="p-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-blue-200 text-[#005a9c] flex items-center justify-center font-bold text-sm overflow-hidden shrink-0 ring-1 ring-sky-400/40">
+                <div class="w-10 h-10 rounded-full bg-blue-100 text-[#005088] flex items-center justify-center font-bold text-sm overflow-hidden shrink-0 ring-1 ring-sky-400/40">
                     @if(Auth::user()->avatar_url)
                         <img src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}" class="w-full h-full object-cover" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='inline';">
                         <span class="hidden">{{ Auth::user()->initials }}</span>

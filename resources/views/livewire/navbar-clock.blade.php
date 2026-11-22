@@ -37,11 +37,11 @@
 
     {{-- RIGHT-MOST NAVBAR TIME CLOCK (CLICKABLE TO OPEN MODAL) --}}
     <button wire:click="openModal" type="button"
-            class="flex items-center px-2.5 py-1 rounded-xl border {{ $isTemp ? 'border-amber-400 bg-amber-950/80 text-amber-200' : 'border-white/30 bg-white/10 hover:bg-white/20 text-white' }} shadow-xs backdrop-blur-xs transition cursor-pointer select-none group"
+            class="flex items-center px-2.5 py-1 rounded-lg border {{ $isTemp ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700' }} shadow-2xs transition cursor-pointer select-none group"
             title="Analog Clock (White) - Click to adjust timezone ({{ $activeTz }}{{ $isTemp ? ' - Temporary Session' : ' - Permanent' }})">
 
         {{-- Only show H:MM AM/PM (EST) --}}
-        <span class="font-bold text-xs sm:text-sm tracking-tight font-mono text-white whitespace-nowrap" x-text="timeStr">{{ $initialTimeStr }}</span>
+        <span class="font-bold text-xs sm:text-sm tracking-tight font-mono {{ $isTemp ? 'text-amber-800' : 'text-gray-800' }} whitespace-nowrap" x-text="timeStr">{{ $initialTimeStr }}</span>
     </button>
 
     {{-- TIME CLOCK & TIMEZONE MODAL --}}
@@ -55,7 +55,7 @@
                 <div class="inline-block bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all my-8 max-w-xl w-full border border-gray-200 dark:border-gray-700 max-h-[580px] flex flex-col">
 
                     {{-- Modal Header --}}
-                    <div class="p-4 bg-gradient-to-r from-blue-900 to-[#005a9c] text-white flex items-center justify-between shrink-0 shadow-xs">
+                    <div class="p-4 bg-[#005088] text-white flex items-center justify-between shrink-0 shadow-xs">
                         <div class="flex items-center gap-2.5">
                             <div class="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white">
                                 <i class="fa-solid fa-clock text-base"></i>

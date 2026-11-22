@@ -1,16 +1,16 @@
 <div class="relative" wire:poll.6s>
-    {{-- Bell Button with Blue Dot Badge --}}
+    {{-- Bell Button with ClockShark Orange Dot Badge --}}
     <button wire:click="toggleDropdown" type="button"
-            class="relative p-2 text-gray-300 hover:text-white rounded-full hover:bg-white/10 transition focus:outline-none flex items-center justify-center"
+            class="relative p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition focus:outline-none flex items-center justify-center"
             title="Notifications">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
 
-        {{-- Cyan/Blue Dot or Count Badge --}}
+        {{-- ClockShark Orange Badge Dot --}}
         @if($unreadCount > 0)
-            <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-sky-400 border-2 border-[#003d6b] rounded-full shadow animate-pulse"></span>
+            <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#f26522] border-2 border-white rounded-full shadow animate-pulse"></span>
         @endif
     </button>
 
@@ -21,7 +21,7 @@
         {{-- Dropdown Card --}}
         <div class="absolute right-0 mt-2 w-84 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden text-gray-800 animate-in fade-in zoom-in duration-100">
             {{-- Header --}}
-            <div class="px-4 py-3 bg-[#00487c] text-white flex justify-between items-center">
+            <div class="px-4 py-3 bg-[#005088] text-white flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <span class="font-bold text-xs uppercase tracking-wider">Notifications</span>
                     @if($unreadCount > 0)

@@ -122,9 +122,17 @@ class CompanySetting extends Model
     public static function getBuiltinFonts(): array
     {
         return [
+            'opensans' => [
+                'id' => 'opensans',
+                'name' => 'Open Sans (ClockShark Default)',
+                'css' => "'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                'category' => 'ClockShark Standard',
+                'google_url' => 'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600;1,700&display=swap',
+                'is_custom' => false,
+            ],
             'aptos' => [
                 'id' => 'aptos',
-                'name' => 'Aptos (Default)',
+                'name' => 'Aptos',
                 'css' => "'Aptos', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 'category' => 'Modern Sans',
                 'google_url' => null,
@@ -144,14 +152,6 @@ class CompanySetting extends Model
                 'css' => "'Roboto', sans-serif",
                 'category' => 'Geometric Sans',
                 'google_url' => 'https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400;1,700&display=swap',
-                'is_custom' => false,
-            ],
-            'opensans' => [
-                'id' => 'opensans',
-                'name' => 'Open Sans',
-                'css' => "'Open Sans', sans-serif",
-                'category' => 'Humanist Sans',
-                'google_url' => 'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400;1,700&display=swap',
                 'is_custom' => false,
             ],
             'poppins' => [
@@ -298,7 +298,7 @@ class CompanySetting extends Model
     public static function getFontCss(string $fontId): string
     {
         $fonts = static::getAvailableFonts();
-        return $fonts[$fontId]['css'] ?? $fonts['aptos']['css'];
+        return $fonts[$fontId]['css'] ?? $fonts['opensans']['css'] ?? "'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     }
 
     public static function getAllNavPages(): array

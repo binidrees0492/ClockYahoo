@@ -17,7 +17,7 @@ class PersonalConfigs extends Component
 
     // Theme & Font
     public $theme_preference = 'light';
-    public $font_preference = 'aptos';
+    public $font_preference = 'opensans';
 
     // Email Configs
     public $use_custom_email = false;
@@ -61,7 +61,7 @@ class PersonalConfigs extends Component
         ];
 
         $this->theme_preference = $user->theme_preference ?: CompanySetting::get('company_theme', 'light');
-        $this->font_preference  = $user->font_preference ?: CompanySetting::get('company_font', 'aptos');
+        $this->font_preference  = $user->font_preference ?: CompanySetting::get('company_font', 'opensans');
 
         $this->use_custom_email  = (bool) $user->use_custom_email;
         $this->smtp_host         = $user->smtp_host ?: CompanySetting::get('mail_host', '');

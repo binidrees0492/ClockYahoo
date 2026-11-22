@@ -42,8 +42,8 @@
 
                 {{-- Live Typography Preview Card --}}
                 @php
-                    $activeFontCss = \App\Models\CompanySetting::getFontCss($font_preference ?? 'aptos');
-                    $activeFontMeta = $availableFonts[$font_preference ?? 'aptos'] ?? ['name' => ucfirst($font_preference ?? 'aptos'), 'category' => 'Font'];
+                    $activeFontCss = \App\Models\CompanySetting::getFontCss($font_preference ?? 'opensans');
+                    $activeFontMeta = $availableFonts[$font_preference ?? 'opensans'] ?? ['name' => ucfirst($font_preference ?? 'opensans'), 'category' => 'Font'];
                 @endphp
                 <div class="mt-4 p-4 rounded-xl border-2 border-blue-200 bg-gradient-to-br from-white to-blue-50/40 shadow-sm"
                      style="font-family: {{ $activeFontCss }};">

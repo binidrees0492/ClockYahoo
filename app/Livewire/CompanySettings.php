@@ -34,7 +34,7 @@ class CompanySettings extends Component
     public $modernCustomIcons = true;
 
     public $companyTheme = 'light'; // 'light', 'dark', 'gradient', 'sage dark green'
-    public $companyFont  = 'aptos'; // 'aptos', 'inter', 'system'
+    public $companyFont  = 'opensans'; // 'opensans', 'inter', 'system'
     public $newLogo = null;
     public $currentLogoPath = null;
     public $setAsFavicon = true;
@@ -111,7 +111,7 @@ class CompanySettings extends Component
         $this->modernCustomIcons     = (bool) CompanySetting::get('modern_custom_icons', true);
 
         $this->companyTheme          = CompanySetting::get('company_theme', 'light');
-        $this->companyFont           = CompanySetting::get('company_font', 'aptos');
+        $this->companyFont           = CompanySetting::get('company_font', 'opensans');
         $this->currentLogoPath       = CompanySetting::get('company_logo');
         $this->setAsFavicon          = (bool) CompanySetting::get('company_logo_as_favicon', true);
 
