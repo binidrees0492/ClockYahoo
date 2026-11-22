@@ -31,7 +31,7 @@
         </button>
         <button type="button" wire:click="setTab('branding')"
                 class="px-4 py-2.5 rounded-t-lg transition border-b-2 flex items-center gap-1.5 {{ $activeTab === 'branding' ? 'border-[#005a9c] text-[#005a9c] bg-white shadow-xs' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100' }}">
-            <span>🎨</span> Branding & Themes
+            <span>🎨</span> Branding & Styling
         </button>
         <button type="button" wire:click="setTab('email_server')"
                 class="px-4 py-2.5 rounded-t-lg transition border-b-2 flex items-center gap-1.5 {{ $activeTab === 'email_server' ? 'border-[#005a9c] text-[#005a9c] bg-white shadow-xs' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100' }}">
@@ -223,171 +223,9 @@
              x-data="{ companyTheme: @entangle('companyTheme').live, companyFont: @entangle('companyFont').live, baseTheme: @entangle('applicationBaseTheme').live }">
             <form wire:submit.prevent="saveBranding" class="space-y-8">
 
-                {{-- SUPER ADMIN MASTER CONFIGURATION: APPLICATION BASE THEME --}}
-                <div class="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white shadow-xl border border-slate-700/80 space-y-5">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-4">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs">Super Admin Master Setting</span>
-                                <span class="text-xs text-indigo-300 font-semibold">• Core Architecture & Design System</span>
-                            </div>
-                            <h2 class="text-lg font-black text-white mt-1 flex items-center gap-2">
-                                <span>⚡</span> Application Base Theme & Layout
-                            </h2>
-                            <p class="text-xs text-slate-300 mt-0.5">
-                                Switch between Classic ClockShark layout and a clean, high-contrast Modern SaaS layout optimized for maximum speed.
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs text-slate-400">Current Base:</span>
-                            <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider {{ $applicationBaseTheme === 'modern' ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-md' : 'bg-slate-700 text-slate-200' }}">
-                                {{ $applicationBaseTheme === 'modern' ? '✨ Modern Layout' : '🏛️ Classic ClockShark' }}
-                            </span>
-                        </div>
-                    </div>
-
-                    {{-- Grid for Classic vs Modern --}}
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {{-- OPTION 1: CLASSIC --}}
-                        <div @click="baseTheme = 'classic'; $wire.switchBaseTheme('classic')"
-                             :class="baseTheme === 'classic' ? 'ring-2 ring-amber-400 bg-slate-800/90 border-amber-400 shadow-xl' : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600'"
-                             class="relative p-5 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col justify-between">
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-lg">🏛️</span>
-                                        <div>
-                                            <h3 class="text-sm font-bold text-white">Classic Base Theme</h3>
-                                            <span class="text-[10px] text-slate-400 font-medium">ClockShark Traditional Architecture</span>
-                                        </div>
-                                    </div>
-                                    <span x-show="baseTheme === 'classic'" class="flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-slate-950 text-xs font-bold">✓</span>
-                                </div>
-
-                                {{-- Visual Mini Mockup of Classic --}}
-                                <div class="h-20 w-full rounded-lg bg-[#f0f2f5] p-2 border border-slate-300 flex flex-col justify-between text-slate-800 shadow-inner overflow-hidden">
-                                    <div class="h-4 bg-[#005a9c] rounded-xs flex items-center px-1.5 justify-between">
-                                        <div class="h-2 w-12 bg-white/80 rounded-xs"></div>
-                                        <div class="flex gap-1">
-                                            <div class="h-1.5 w-6 bg-white/60 rounded-xs"></div>
-                                            <div class="h-1.5 w-6 bg-white/60 rounded-xs"></div>
-                                        </div>
-                                    </div>
-                                    <div class="flex gap-1.5 h-10">
-                                        <div class="flex-1 bg-white border border-gray-300 rounded p-1 flex flex-col justify-around">
-                                            <div class="h-1.5 w-14 bg-gray-400 rounded-xs"></div>
-                                            <div class="h-2 w-8 bg-[#005a9c] rounded-xs"></div>
-                                        </div>
-                                        <div class="w-16 bg-white border border-gray-300 rounded p-1 flex flex-col justify-around">
-                                            <div class="h-1.5 w-10 bg-gray-400 rounded-xs"></div>
-                                            <div class="h-2 w-6 bg-emerald-600 rounded-xs"></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <ul class="text-[11px] text-slate-300 space-y-1 pt-1">
-                                    <li class="flex items-center gap-1.5"><i class="fa-solid fa-check text-slate-400 text-[10px]"></i> Traditional solid navy ClockShark top navigation bar</li>
-                                    <li class="flex items-center gap-1.5"><i class="fa-solid fa-check text-slate-400 text-[10px]"></i> Standard enterprise density & classic table layout</li>
-                                    <li class="flex items-center gap-1.5"><i class="fa-solid fa-check text-slate-400 text-[10px]"></i> Familiar legacy workforce management layout</li>
-                                </ul>
-                            </div>
-
-                            <button type="button" @click.stop="baseTheme = 'classic'; $wire.switchBaseTheme('classic')"
-                                    class="mt-4 w-full py-1.5 px-3 rounded-lg text-xs font-bold text-center transition border {{ $applicationBaseTheme === 'classic' ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-slate-700/60 hover:bg-slate-700 text-slate-200 border-slate-600' }}">
-                                {{ $applicationBaseTheme === 'classic' ? '✓ Currently Active (Classic)' : 'Select Classic' }}
-                            </button>
-                        </div>
-
-                        {{-- OPTION 2: MODERN --}}
-                        <div @click="baseTheme = 'modern'; $wire.switchBaseTheme('modern')"
-                             :class="baseTheme === 'modern' ? 'ring-2 ring-indigo-400 bg-slate-800/90 border-indigo-400 shadow-xl shadow-indigo-950/50' : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600'"
-                             class="relative p-5 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col justify-between">
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-lg">✨</span>
-                                        <div>
-                                            <div class="flex items-center gap-1.5">
-                                                <h3 class="text-sm font-bold text-white">Modern Theme</h3>
-                                                <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-indigo-500 text-white">Non-ClockShark</span>
-                                            </div>
-                                            <span class="text-[10px] text-indigo-300 font-medium">Next-Gen SaaS Layout & High-Contrast Design</span>
-                                        </div>
-                                    </div>
-                                    <span x-show="baseTheme === 'modern'" class="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-sky-400 text-white text-xs font-bold">✓</span>
-                                </div>
-
-                                {{-- Visual Mini Mockup of Modern --}}
-                                <div class="h-20 w-full rounded-lg bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-2 border border-indigo-500/40 flex flex-col justify-between text-white shadow-inner overflow-hidden">
-                                    <div class="h-4 bg-slate-900 rounded-md flex items-center px-1.5 justify-between border border-slate-700/60">
-                                        <div class="flex items-center gap-1">
-                                            <div class="h-2 w-2 rounded-full bg-gradient-to-r from-indigo-400 to-sky-400"></div>
-                                            <div class="h-1.5 w-10 bg-indigo-200 rounded-full"></div>
-                                        </div>
-                                        <div class="flex gap-1 items-center">
-                                            <div class="h-1.5 w-7 bg-indigo-500/40 rounded-full border border-indigo-400/40"></div>
-                                            <div class="h-2 w-2 rounded-full bg-emerald-400"></div>
-                                        </div>
-                                    </div>
-                                    <div class="flex gap-1.5 h-10">
-                                        <div class="flex-1 bg-slate-800 border border-slate-700/60 rounded-md p-1 flex flex-col justify-around shadow-sm">
-                                            <div class="h-1.5 w-12 bg-slate-400 rounded-full"></div>
-                                            <div class="h-2 w-10 bg-gradient-to-r from-indigo-400 to-sky-400 rounded-full"></div>
-                                        </div>
-                                        <div class="w-16 bg-slate-800 border border-slate-700/60 rounded-md p-1 flex flex-col justify-around shadow-sm">
-                                            <div class="h-1.5 w-8 bg-slate-400 rounded-full"></div>
-                                            <div class="h-2 w-8 bg-emerald-400 rounded-full"></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <ul class="text-[11px] text-slate-300 space-y-1 pt-1">
-                                    <li class="flex items-center gap-1.5"><i class="fa-solid fa-palette text-sky-400 text-[10px]"></i> Sleek dark slate navigation header with high-contrast surfaces</li>
-                                    <li class="flex items-center gap-1.5"><i class="fa-solid fa-icons text-amber-400 text-[10px]"></i> Duotone styled icons inside soft pill containers</li>
-                                    <li class="flex items-center gap-1.5"><i class="fa-solid fa-wand-magic-sparkles text-pink-400 text-[10px]"></i> Modern card geometry, elevated borders, and crisp readability</li>
-                                    <li class="flex items-center gap-1.5"><i class="fa-solid fa-bolt text-emerald-400 text-[10px]"></i> Ultra-fast page execution with zero render-blocking overhead</li>
-                                </ul>
-                            </div>
-
-                            <button type="button" @click.stop="baseTheme = 'modern'; $wire.switchBaseTheme('modern')"
-                                    class="mt-4 w-full py-1.5 px-3 rounded-lg text-xs font-bold text-center transition border {{ $applicationBaseTheme === 'modern' ? 'bg-gradient-to-r from-indigo-500 to-sky-500 text-white border-indigo-400 shadow-md' : 'bg-slate-700/60 hover:bg-slate-700 text-slate-200 border-slate-600' }}">
-                                {{ $applicationBaseTheme === 'modern' ? '✓ Currently Active (Modern)' : 'Select Modern' }}
-                            </button>
-                        </div>
-                    </div>
-
-                    {{-- Modern Advanced Visual Experience Toggles --}}
-                    <div class="pt-3 border-t border-slate-700/80">
-                        <div class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <span>🎛️</span> Modern Styling & Feature Toggles
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                            <label class="flex items-start gap-2.5 p-3 rounded-lg bg-slate-800/60 border border-slate-700/60 cursor-pointer hover:bg-slate-800 transition">
-                                <input type="checkbox" wire:model.live="modernHighContrast" class="mt-0.5 rounded text-indigo-500 focus:ring-indigo-400">
-                                <div>
-                                    <span class="font-bold text-white block">High Contrast Mode</span>
-                                    <span class="text-[10px] text-slate-400">Elevated surface borders and WCAG AAA readability</span>
-                                </div>
-                            </label>
-
-                            <label class="flex items-start gap-2.5 p-3 rounded-lg bg-slate-800/60 border border-slate-700/60 cursor-pointer hover:bg-slate-800 transition">
-                                <input type="checkbox" wire:model.live="modernMicroAnimations" class="mt-0.5 rounded text-indigo-500 focus:ring-indigo-400">
-                                <div>
-                                    <span class="font-bold text-white block">Micro-Animations</span>
-                                    <span class="text-[10px] text-slate-400">Card hover elevation, active button scale, smooth transitions</span>
-                                </div>
-                            </label>
-
-                            <label class="flex items-start gap-2.5 p-3 rounded-lg bg-slate-800/60 border border-slate-700/60 cursor-pointer hover:bg-slate-800 transition">
-                                <input type="checkbox" wire:model.live="modernCustomIcons" class="mt-0.5 rounded text-indigo-500 focus:ring-indigo-400">
-                                <div>
-                                    <span class="font-bold text-white block">Duotone Styled Icons</span>
-                                    <span class="text-[10px] text-slate-400">Modern badges with tinted pastel background pills</span>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                </div>
+                {{-- Hidden bindings for ClockShark-locked theme configuration --}}
+                <input type="hidden" wire:model="applicationBaseTheme" value="classic">
+                <input type="hidden" wire:model="companyTheme" value="light">
 
                 {{-- Company Logo Section --}}
                 <div class="space-y-4">
@@ -435,88 +273,6 @@
                             </div>
                             <p class="text-[11px] text-gray-400">Supported formats: PNG, JPG, SVG, WebP. Max 3MB. There is no delete option; you can replace it anytime with a new image.</p>
                         </div>
-                    </div>
-                </div>
-
-                {{-- Global Theme Switcher --}}
-                <div class="border-t border-gray-100 pt-6 space-y-4">
-                    <div>
-                        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800">Application Global Theme</h2>
-                        <p class="text-xs text-gray-500 mt-0.5">Choose the default visual appearance for all employees and visitors. Individual users can also select their personal preference in their profile.</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {{-- Light --}}
-                        <label @click="companyTheme = 'light'"
-                               wire:click="$set('companyTheme', 'light')"
-                               :class="companyTheme === 'light' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50'"
-                               class="relative flex flex-col p-4 rounded-xl cursor-pointer transition select-none {{ $companyTheme === 'light' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50' }}">
-                            <input type="radio" wire:model.live="companyTheme" value="light" class="sr-only">
-                            <span x-show="companyTheme === 'light'" class="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#005a9c] text-white text-[11px] font-bold shadow-xs">✓</span>
-                            <div class="h-16 w-full rounded-md border border-gray-200 bg-[#f9fafb] p-2 flex flex-col justify-between mb-3 shadow-xs">
-                                <div class="h-3 w-16 bg-[#005a9c] rounded-xs"></div>
-                                <div class="flex gap-1.5">
-                                    <div class="h-4 flex-1 bg-white border border-gray-200 rounded-xs"></div>
-                                    <div class="h-4 w-6 bg-blue-100 rounded-xs"></div>
-                                </div>
-                            </div>
-                            <span class="text-xs font-bold text-gray-900">☀️ Light (Default)</span>
-                            <span class="text-[11px] text-gray-500 mt-0.5">Classic clean interface with high contrast light background.</span>
-                        </label>
-
-                        {{-- Dark --}}
-                        <label @click="companyTheme = 'dark'"
-                               wire:click="$set('companyTheme', 'dark')"
-                               :class="companyTheme === 'dark' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50'"
-                               class="relative flex flex-col p-4 rounded-xl cursor-pointer transition select-none {{ $companyTheme === 'dark' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50' }}">
-                            <input type="radio" wire:model.live="companyTheme" value="dark" class="sr-only">
-                            <span x-show="companyTheme === 'dark'" class="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#005a9c] text-white text-[11px] font-bold shadow-xs">✓</span>
-                            <div class="h-16 w-full rounded-md border border-gray-700 bg-[#111827] p-2 flex flex-col justify-between mb-3 shadow-xs">
-                                <div class="h-3 w-16 bg-[#005a9c] rounded-xs"></div>
-                                <div class="flex gap-1.5">
-                                    <div class="h-4 flex-1 bg-[#1f2937] border border-gray-700 rounded-xs"></div>
-                                    <div class="h-4 w-6 bg-[#374151] rounded-xs"></div>
-                                </div>
-                            </div>
-                            <span class="text-xs font-bold text-gray-900">🌙 Dark Mode</span>
-                            <span class="text-[11px] text-gray-500 mt-0.5">Sleek midnight dark background easy on the eyes in low light.</span>
-                        </label>
-
-                        {{-- Gradient --}}
-                        <label @click="companyTheme = 'gradient'"
-                               wire:click="$set('companyTheme', 'gradient')"
-                               :class="companyTheme === 'gradient' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50'"
-                               class="relative flex flex-col p-4 rounded-xl cursor-pointer transition select-none {{ $companyTheme === 'gradient' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50' }}">
-                            <input type="radio" wire:model.live="companyTheme" value="gradient" class="sr-only">
-                            <span x-show="companyTheme === 'gradient'" class="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#005a9c] text-white text-[11px] font-bold shadow-xs">✓</span>
-                            <div class="h-16 w-full rounded-md border border-indigo-200 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-50 p-2 flex flex-col justify-between mb-3 shadow-xs">
-                                <div class="h-3 w-16 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xs"></div>
-                                <div class="flex gap-1.5">
-                                    <div class="h-4 flex-1 bg-white/80 border border-indigo-100 rounded-xs"></div>
-                                    <div class="h-4 w-6 bg-indigo-200 rounded-xs"></div>
-                                </div>
-                            </div>
-                            <span class="text-xs font-bold text-gray-900">✨ Gradient Modern</span>
-                            <span class="text-[11px] text-gray-500 mt-0.5">Vibrant, ultra-modern indigo and violet gradient aesthetics.</span>
-                        </label>
-
-                        {{-- Sage Dark Green --}}
-                        <label @click="companyTheme = 'sage dark green'"
-                               wire:click="$set('companyTheme', 'sage dark green')"
-                               :class="companyTheme === 'sage dark green' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50'"
-                               class="relative flex flex-col p-4 rounded-xl cursor-pointer transition select-none {{ $companyTheme === 'sage dark green' ? 'border-2 border-[#005a9c] ring-2 ring-offset-1 ring-[#005a9c] bg-blue-50/80 shadow-xs' : 'border border-gray-200 hover:bg-gray-50' }}">
-                            <input type="radio" wire:model.live="companyTheme" value="sage dark green" class="sr-only">
-                            <span x-show="companyTheme === 'sage dark green'" class="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#005a9c] text-white text-[11px] font-bold shadow-xs">✓</span>
-                            <div class="h-16 w-full rounded-md border border-[#2b3e34] bg-[#141e1b] p-2 flex flex-col justify-between mb-3 shadow-xs">
-                                <div class="h-3 w-16 bg-[#2d5a49] rounded-xs"></div>
-                                <div class="flex gap-1.5">
-                                    <div class="h-4 flex-1 bg-[#1f2f2a] border border-[#2b3e34] rounded-xs"></div>
-                                    <div class="h-4 w-6 bg-[#3b544b] rounded-xs"></div>
-                                </div>
-                            </div>
-                            <span class="text-xs font-bold text-gray-900">🌿 Sage Dark Green</span>
-                            <span class="text-[11px] text-gray-500 mt-0.5">Earthy forest dark tones with calming sage and emerald accents.</span>
-                        </label>
                     </div>
                 </div>
 
@@ -690,7 +446,7 @@
 
                 <div class="border-t border-gray-100 pt-5 flex justify-end">
                     <button type="submit" class="px-5 py-2.5 bg-[#005a9c] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition">
-                        Save Branding & Theme
+                        Save Branding
                     </button>
                 </div>
             </form>

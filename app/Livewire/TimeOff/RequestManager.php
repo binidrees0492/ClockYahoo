@@ -397,13 +397,12 @@ class RequestManager extends Component
         }
 
         $policy = TimeOffPolicy::find($this->policy_id);
-        $isUnpaidPolicy = $policy && (int)$policy->policy_type === 2;
 
         $isEnrolled = TimeOffPolicyEmployee::where('employee_id', $this->selected_employee_id)
             ->where('policy_id', $this->policy_id)
             ->exists();
 
-        if (!$isEnrolled && $isUnpaidPolicy) {
+        if (!$isEnrolled && $policy && $policy->active) {
             TimeOffPolicyEmployee::firstOrCreate(
                 ['employee_id' => $this->selected_employee_id, 'policy_id' => $this->policy_id],
                 ['hours_remaining' => 0]
@@ -991,16 +990,16 @@ class RequestManager extends Component
             ->whereHas('policy', fn($q) => $q->where('active', true))
             ->get();
 
-        // Ensure active Unpaid Time Off policies are always requestable
-        $unpaidPolicies = TimeOffPolicy::where('active', true)->where('policy_type', 2)->get();
-        foreach ($unpaidPolicies as $up) {
-            if (!$empPolicies->contains(fn($ep) => $ep->policy_id === $up->id)) {
+        // Ensure all active policies are requestable (including Vacation, Sick, and Unpaid)
+        $allActivePolicies = TimeOffPolicy::where('active', true)->orderBy('name')->get();
+        foreach ($allActivePolicies as $activePol) {
+            if (!$empPolicies->contains(fn($ep) => $ep->policy_id === $activePol->id)) {
                 $virtualEnrollment = new TimeOffPolicyEmployee([
                     'employee_id'     => $this->selected_employee_id,
-                    'policy_id'       => $up->id,
+                    'policy_id'       => $activePol->id,
                     'hours_remaining' => 0,
                 ]);
-                $virtualEnrollment->setRelation('policy', $up);
+                $virtualEnrollment->setRelation('policy', $activePol);
                 $empPolicies->push($virtualEnrollment);
             }
         }

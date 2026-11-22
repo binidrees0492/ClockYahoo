@@ -107,8 +107,8 @@
                         </span>
                     </td>
                     <td class="p-3 text-xs text-gray-600">
-                        <div><strong>Routing:</strong> {{ $req->approver?->name ?? 'Admins / HR' }}</div>
-                        <div class="text-[11px] text-gray-400">Routes to: {{ $req->approver?->name ? $req->approver?->name.' & HR Team' : 'HR Manager Team' }}</div>
+                        <div><strong>Routing:</strong> {{ $req->approver?->name ?? 'HR Managers & Admins' }}</div>
+                        <div class="text-[11px] text-gray-400">Routes to: {{ $req->approver?->name ? $req->approver?->name.' & HR Team' : 'HR Managers & Admins' }}</div>
                     </td>
                     <td class="p-3 text-center">
                             <span class="px-2 py-0.5 rounded text-xs font-semibold

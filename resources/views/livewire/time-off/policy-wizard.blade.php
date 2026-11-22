@@ -31,12 +31,15 @@
         <div class="flex items-stretch text-sm">
 
             @php
-                $steps = [
+                $allSteps = [
                     ['key' => 'PolicyDetails',      'label' => 'Policy Details'],
                     ['key' => 'AdditionalSettings', 'label' => 'Additional Settings'],
                     ['key' => 'EmployeeSelection',  'label' => 'Employee Selection'],
                     ['key' => 'EmployeeDetails',    'label' => 'Employee Details'],
                 ];
+                $steps = (int)$policyType === 2
+                    ? array_values(array_filter($allSteps, fn($s) => $s['key'] !== 'AdditionalSettings'))
+                    : $allSteps;
                 $order = array_column($steps, 'key');
                 $currentIdx = array_search($step, $order, true);
             @endphp
@@ -152,18 +155,18 @@
             @endif
 
             <div class="flex items-center gap-3 pt-2">
-                <button wire:click="cancel"
+                <button type="button" wire:click="cancel"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     &#8592; Go Back
                 </button>
 
                 @if((int)$policyType === 2)
-                    <button wire:click="saveAndGoToEmployeeSelection"
+                    <button type="button" wire:key="btn-unpaid-next" wire:click="saveAndGoToEmployeeSelection"
                             class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                         Save and go to Employee Selection &#8594;
                     </button>
                 @else
-                    <button wire:click="goToAdditionalSettings"
+                    <button type="button" wire:key="btn-paid-next" wire:click="goToAdditionalSettings"
                             class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                         Additional Settings &#8594;
                     </button>
@@ -259,12 +262,12 @@
             @endif
 
             <div class="flex items-center gap-3 pt-2">
-                <button wire:click="goBackToPolicyDetails"
+                <button type="button" wire:click="goBackToPolicyDetails"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     &#8592; Policy Details
                 </button>
 
-                <button wire:click="goToEmployeeSelection"
+                <button type="button" wire:click="goToEmployeeSelection"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     Save and go to Employee Selection &#8594;
                 </button>
@@ -307,12 +310,12 @@
             @endif
 
             <div class="flex items-center gap-3 pt-2">
-                <button wire:click="goBackFromEmployeeSelection"
+                <button type="button" wire:click="goBackFromEmployeeSelection"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     &#8592; {{ (int)$policyType === 2 ? 'Policy Details' : 'Additional Settings' }}
                 </button>
 
-                <button wire:click="goToEmployeeDetails"
+                <button type="button" wire:click="goToEmployeeDetails"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     Employee Details &#8594;
                 </button>
@@ -376,12 +379,12 @@
             @endif
 
             <div class="flex items-center gap-3 pt-2">
-                <button wire:click="goBackToEmployeeSelection"
+                <button type="button" wire:click="goBackToEmployeeSelection"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     &#8592; Employee Selection
                 </button>
 
-                <button wire:click="saveAndFinish"
+                <button type="button" wire:click="saveAndFinish"
                         class="bg-cs-blue hover:bg-blue-800 text-white px-5 py-2 rounded text-sm font-semibold flex items-center gap-2">
                     Save and Return to Policy Details &#8594;
                 </button>

@@ -11,80 +11,8 @@
     {{-- TAB CONTENT: THEME & REGIONAL --}}
     @if($activeTab === 'theme' || $activeTab === 'all')
         <div class="space-y-6" x-data="{ activeTheme: @entangle('theme_preference').live, activeFont: @entangle('font_preference').live }">
-            <div>
-                <h3 class="text-sm font-bold text-gray-900">Application Theme</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Choose your visual appearance and contrast style for ClockVerse.</p>
-
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                    {{-- Light --}}
-                    <label @click="activeTheme = 'light'"
-                           wire:click="$set('theme_preference', 'light')"
-                           :class="activeTheme === 'light' ? 'border-[#005a9c] ring-2 ring-[#005a9c]/50 bg-blue-50/80 shadow-xs' : 'border-gray-200 hover:bg-gray-50'"
-                           class="relative flex flex-col p-3.5 border-2 rounded-xl cursor-pointer transition select-none">
-                        <input type="radio" wire:model.live="theme_preference" value="light" class="sr-only">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-900">☀️ Light</span>
-                            <span x-show="activeTheme === 'light'" class="w-4 h-4 rounded-full bg-[#005a9c] text-white text-[10px] flex items-center justify-center font-bold">✓</span>
-                        </div>
-                        <div class="h-10 w-full rounded bg-white border border-gray-200 p-1 flex flex-col justify-between">
-                            <div class="h-2 w-10 bg-[#005a9c] rounded-xs"></div>
-                            <div class="h-2 w-full bg-gray-100 rounded-xs"></div>
-                        </div>
-                        <span class="text-[10px] text-gray-500 mt-1.5">Classic clean interface</span>
-                    </label>
-
-                    {{-- Dark --}}
-                    <label @click="activeTheme = 'dark'"
-                           wire:click="$set('theme_preference', 'dark')"
-                           :class="activeTheme === 'dark' ? 'border-[#005a9c] ring-2 ring-[#005a9c]/50 bg-blue-50/80 shadow-xs' : 'border-gray-200 hover:bg-gray-50'"
-                           class="relative flex flex-col p-3.5 border-2 rounded-xl cursor-pointer transition select-none">
-                        <input type="radio" wire:model.live="theme_preference" value="dark" class="sr-only">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-900">🌙 Dark Mode</span>
-                            <span x-show="activeTheme === 'dark'" class="w-4 h-4 rounded-full bg-[#005a9c] text-white text-[10px] flex items-center justify-center font-bold">✓</span>
-                        </div>
-                        <div class="h-10 w-full rounded bg-slate-900 border border-slate-700 p-1 flex flex-col justify-between">
-                            <div class="h-2 w-10 bg-[#005a9c] rounded-xs"></div>
-                            <div class="h-2 w-full bg-slate-800 rounded-xs"></div>
-                        </div>
-                        <span class="text-[10px] text-gray-500 mt-1.5">Midnight dark palette</span>
-                    </label>
-
-                    {{-- Gradient --}}
-                    <label @click="activeTheme = 'gradient'"
-                           wire:click="$set('theme_preference', 'gradient')"
-                           :class="activeTheme === 'gradient' ? 'border-[#005a9c] ring-2 ring-[#005a9c]/50 bg-blue-50/80 shadow-xs' : 'border-gray-200 hover:bg-gray-50'"
-                           class="relative flex flex-col p-3.5 border-2 rounded-xl cursor-pointer transition select-none">
-                        <input type="radio" wire:model.live="theme_preference" value="gradient" class="sr-only">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-900">✨ Gradient</span>
-                            <span x-show="activeTheme === 'gradient'" class="w-4 h-4 rounded-full bg-[#005a9c] text-white text-[10px] flex items-center justify-center font-bold">✓</span>
-                        </div>
-                        <div class="h-10 w-full rounded bg-gradient-to-tr from-slate-900 via-indigo-950 to-blue-900 border border-indigo-700 p-1 flex flex-col justify-between">
-                            <div class="h-2 w-10 bg-indigo-400 rounded-xs"></div>
-                            <div class="h-2 w-full bg-indigo-900/60 rounded-xs"></div>
-                        </div>
-                        <span class="text-[10px] text-gray-500 mt-1.5">Modern indigo & violet</span>
-                    </label>
-
-                    {{-- Sage Dark Green --}}
-                    <label @click="activeTheme = 'sage dark green'"
-                           wire:click="$set('theme_preference', 'sage dark green')"
-                           :class="activeTheme === 'sage dark green' ? 'border-[#005a9c] ring-2 ring-[#005a9c]/50 bg-blue-50/80 shadow-xs' : 'border-gray-200 hover:bg-gray-50'"
-                           class="relative flex flex-col p-3.5 border-2 rounded-xl cursor-pointer transition select-none">
-                        <input type="radio" wire:model.live="theme_preference" value="sage dark green" class="sr-only">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-900">🌿 Sage Green</span>
-                            <span x-show="activeTheme === 'sage dark green'" class="w-4 h-4 rounded-full bg-[#005a9c] text-white text-[10px] flex items-center justify-center font-bold">✓</span>
-                        </div>
-                        <div class="h-10 w-full rounded bg-[#131c18] border border-[#2d423a] p-1 flex flex-col justify-between">
-                            <div class="h-2 w-10 bg-emerald-500 rounded-xs"></div>
-                            <div class="h-2 w-full bg-[#27473b] rounded-xs"></div>
-                        </div>
-                        <span class="text-[10px] text-gray-500 mt-1.5">Deep forest & sage dark</span>
-                    </label>
-                </div>
-            </div>
+            {{-- Interface theme locked to ClockShark signature design --}}
+            <input type="hidden" wire:model.live="theme_preference" value="light">
 
             {{-- FONT FAMILY SELECTION (Dropdown & Live Preview) --}}
             <div class="border-t border-gray-100 pt-5">

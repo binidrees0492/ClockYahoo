@@ -1,9 +1,11 @@
 <div>
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-light text-gray-800">Employees</h1>
-        <button wire:click="openAddModal" class="bg-[#005b8f] hover:bg-[#004a75] text-white px-4 py-2 rounded text-sm font-semibold shadow-sm transition">
-            Add Employee
-        </button>
+        @if(auth()->user()->isAdmin() || auth()->user()->isHrManager())
+            <button wire:click="openAddModal" class="bg-[#005b8f] hover:bg-[#004a75] text-white px-4 py-2 rounded text-sm font-semibold shadow-sm transition">
+                Add Employee
+            </button>
+        @endif
     </div>
 
     @if (session()->has('message'))

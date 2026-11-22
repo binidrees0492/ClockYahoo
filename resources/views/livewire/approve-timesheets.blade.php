@@ -3,16 +3,60 @@
         <div x-data x-init="window.showToast(@js($toastMessage), @js($toastType ?? 'success'))" class="hidden"></div>
     @endif
 
-    {{-- VIEW MODE TOGGLE --}}
-    <div class="flex items-center justify-between mb-4">
+    {{-- PAY PERIOD NAVIGATION & VIEW MODE BAR --}}
+    @php
+        $weekStartDay = \App\Models\CompanySetting::getWeekStartDay();
+        $anchor = \Carbon\Carbon::now()->startOfWeek($weekStartDay)->addWeeks($payPeriodOffset * 2);
+        $ppLabel = $payPeriodOffset === 0 ? 'Current Pay Period' : ($payPeriodOffset === -1 ? 'Last Pay Period' : ($payPeriodOffset < 0 ? abs($payPeriodOffset) . ' Pay Periods Ago' : $payPeriodOffset . ' Pay Periods Later'));
+        $ppDates = ucfirst($anchor->format('M j')) . ' – ' . ucfirst($anchor->copy()->addDays(13)->format('M j, Y'));
+    @endphp
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+        {{-- Pay Period Navigator matching ClockShark --}}
+        <div class="flex items-center gap-3" x-data="{ openPPDropdown: false }">
+            <button wire:click="previousPayPeriod" type="button" class="text-gray-500 hover:text-gray-800 text-base font-bold px-2 py-1 rounded hover:bg-gray-100" title="Previous Pay Period">&#9664;</button>
+            <button wire:click="nextPayPeriod"     type="button" class="text-gray-500 hover:text-gray-800 text-base font-bold px-2 py-1 rounded hover:bg-gray-100" title="Next Pay Period">&#9654;</button>
+
+            <div class="relative">
+                <button type="button" @click="openPPDropdown = !openPPDropdown"
+                        class="text-base font-semibold text-gray-800 flex items-center gap-2 hover:text-[#005a9c] transition focus:outline-none cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-2xs">
+                    <span class="font-bold text-gray-900">{{ $ppLabel }}</span>
+                    <span class="font-normal text-gray-500 text-sm">{{ $ppDates }}</span>
+                    <span class="text-[9px] text-gray-400">&#9660;</span>
+                </button>
+
+                <div x-show="openPPDropdown"
+                     x-cloak
+                     @click.away="openPPDropdown = false"
+                     class="absolute left-0 top-full mt-1.5 z-50 bg-white border border-gray-200 rounded-lg shadow-xl py-1.5 w-64 text-xs">
+                    <div class="px-3 py-1 text-[10px] uppercase font-bold text-gray-400 border-b border-gray-100">Select Pay Period</div>
+                    <button type="button" wire:click="selectPayPeriodPreset(0)" @click="openPPDropdown = false"
+                            class="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-[#005a9c] flex items-center justify-between {{ $payPeriodOffset === 0 ? 'bg-blue-50 font-bold text-[#005a9c]' : '' }}">
+                        <span>Current Pay Period</span>
+                    </button>
+                    <button type="button" wire:click="selectPayPeriodPreset(-1)" @click="openPPDropdown = false"
+                            class="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-[#005a9c] flex items-center justify-between {{ $payPeriodOffset === -1 ? 'bg-blue-50 font-bold text-[#005a9c]' : '' }}">
+                        <span>Last Pay Period</span>
+                    </button>
+                    <button type="button" wire:click="selectPayPeriodPreset(-2)" @click="openPPDropdown = false"
+                            class="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-[#005a9c] flex items-center justify-between {{ $payPeriodOffset === -2 ? 'bg-blue-50 font-bold text-[#005a9c]' : '' }}">
+                        <span>Two Pay Periods Ago</span>
+                    </button>
+                    <button type="button" wire:click="selectPayPeriodPreset(-3)" @click="openPPDropdown = false"
+                            class="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-[#005a9c] flex items-center justify-between {{ $payPeriodOffset === -3 ? 'bg-blue-50 font-bold text-[#005a9c]' : '' }}">
+                        <span>Three Pay Periods Ago</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm text-xs">
-            <button type="button" wire:click="setViewMode('entries')"
-                    class="px-4 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 {{ $viewMode === 'entries' ? 'bg-[#005a9c] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
-                <span>📋 Time Entries Detail</span>
-            </button>
             <button type="button" wire:click="setViewMode('summary')"
                     class="px-4 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 {{ $viewMode === 'summary' ? 'bg-[#005a9c] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
                 <span>📊 Pay Period Summary</span>
+            </button>
+            <button type="button" wire:click="setViewMode('entries')"
+                    class="px-4 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 {{ $viewMode === 'entries' ? 'bg-[#005a9c] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                <span>📋 Time Entries Detail</span>
             </button>
         </div>
     </div>

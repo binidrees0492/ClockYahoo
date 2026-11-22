@@ -223,21 +223,25 @@ class WebmailAndPasskeyFeaturesTest extends TestCase
 
     public function test_navbar_displays_webmail_mail_log_and_notifications_log_links(): void
     {
-        $user = User::factory()->create([
+        $employee = User::factory()->create([
             'role' => 'Employee',
         ]);
 
-        $this->actingAs($user);
-
+        $this->actingAs($employee);
         $response = $this->get('/dashboard');
         $response->assertOk();
+        $response->assertDontSee(route('webmail'));
+        $response->assertDontSee(route('mail.logs'));
 
-        // Desktop and Mobile navbar links
-        $response->assertSee(route('webmail'));
-        $response->assertSee('Webmail');
-        $response->assertSee(route('mail.logs'));
-        $response->assertSee('Mail Log');
-        $response->assertSee(route('notifications.log'));
-        $response->assertSee('Notifications Log');
+        $superAdmin = User::factory()->create([
+            'role' => 'Super Admin',
+        ]);
+
+        $this->actingAs($superAdmin);
+        $superResponse = $this->get('/dashboard');
+        $superResponse->assertOk();
+        $superResponse->assertSee(route('webmail'));
+        $superResponse->assertSee('Webmail');
+        $superResponse->assertSee(route('mail.logs'));
     }
 }

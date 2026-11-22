@@ -32,7 +32,8 @@ class ApproveTimesheets extends Component
 
     public $toastMessage = null;
     public $toastType = 'success';
-    public $viewMode = 'entries'; // 'entries' | 'summary'
+    public $viewMode = 'summary'; // 'summary' (ClockShark Pay Period Summary default) | 'entries'
+    public $payPeriodOffset = 0;
 
     public function mount()
     {
@@ -41,9 +42,39 @@ class ApproveTimesheets extends Component
             abort(403, 'Unauthorized to access timesheet approvals.');
         }
 
+        $this->syncPayPeriodDates();
+    }
+
+    public function syncPayPeriodDates(): void
+    {
         $weekStartDay = CompanySetting::getWeekStartDay();
-        $this->fromDate = Carbon::now()->startOfWeek($weekStartDay)->toDateString();
-        $this->toDate   = Carbon::now()->startOfWeek($weekStartDay)->addDays(6)->toDateString();
+        $anchor = Carbon::now()->startOfWeek($weekStartDay)->addWeeks($this->payPeriodOffset * 2);
+        $this->fromDate = $anchor->toDateString();
+        $this->toDate   = $anchor->copy()->addDays(13)->toDateString();
+    }
+
+    public function previousPayPeriod(): void
+    {
+        $this->payPeriodOffset--;
+        $this->syncPayPeriodDates();
+    }
+
+    public function nextPayPeriod(): void
+    {
+        $this->payPeriodOffset++;
+        $this->syncPayPeriodDates();
+    }
+
+    public function currentPayPeriod(): void
+    {
+        $this->payPeriodOffset = 0;
+        $this->syncPayPeriodDates();
+    }
+
+    public function selectPayPeriodPreset(int $offset): void
+    {
+        $this->payPeriodOffset = $offset;
+        $this->syncPayPeriodDates();
     }
 
     public function updatedSelectAll($value)

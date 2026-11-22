@@ -129,7 +129,22 @@ class PolicyWizard extends Component
 
     public function saveAndGoToEmployeeSelection()
     {
-        return $this->goToAdditionalSettings();
+        $this->policyType = (int) $this->policyType;
+        $this->validate([
+            'policyName' => 'required|string|max:100',
+            'policyType' => 'required|integer|in:0,1,2',
+        ]);
+
+        $this->policyIsLimit      = 0;
+        $this->policyIsCarryover  = 0;
+        $this->policyIsWaiting    = 0;
+        $this->policyWaitingDays  = null;
+        $this->policyMaxCarryover = null;
+        $this->policyMaxBalance   = null;
+        $this->policyAccrualHours = null;
+
+        $this->savePolicy();
+        $this->step = 'EmployeeSelection';
     }
 
     public function goBackFromEmployeeSelection()
@@ -251,6 +266,10 @@ class PolicyWizard extends Component
         // Allow step jumping if editing existing policy or moving backwards
         $validSteps = ['PolicyDetails', 'AdditionalSettings', 'EmployeeSelection', 'EmployeeDetails'];
         if (!in_array($targetStep, $validSteps)) return;
+
+        if ((int)$this->policyType === 2 && $targetStep === 'AdditionalSettings') {
+            return;
+        }
 
         if ($this->policyId) {
             $this->savePolicy();

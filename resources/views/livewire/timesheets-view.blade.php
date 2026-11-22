@@ -29,15 +29,15 @@
     </div>
 
     {{-- TOOLBAR --}}
-    <div class="flex justify-between items-center mb-3">
+    <div class="flex justify-between items-center mb-3" x-data="{ openDatePicker: false, openTzDropdown: false }">
         <div class="flex items-center gap-4">
             <button wire:click="previousWeek" class="text-gray-500 hover:text-gray-800 text-lg font-bold" title="Previous Week">&#9664;</button>
             <button wire:click="nextWeek"     class="text-gray-500 hover:text-gray-800 text-lg font-bold" title="Next Week">&#9654;</button>
 
             {{-- Date Range Dropdown Trigger --}}
             <div class="relative">
-                <button type="button" wire:click="toggleDatePicker"
-                        class="text-lg font-semibold text-gray-800 flex items-center gap-1.5 hover:text-[#005a9c] transition focus:outline-none">
+                <button type="button" @click="openDatePicker = !openDatePicker"
+                        class="text-lg font-semibold text-gray-800 flex items-center gap-1.5 hover:text-[#005a9c] transition focus:outline-none cursor-pointer">
                     <span>{{ $weekOffset === 0 ? 'This Week' : ($weekOffset === -1 ? 'Last Week' : ($weekOffset === 1 ? 'Next Week' : abs($weekOffset) . ' Wk ' . ($weekOffset < 0 ? 'Ago' : 'Later'))) }}</span>
                     <span class="font-normal text-gray-500 text-base">
                         {{ ucfirst($startOfWeek->format('M j')) }} &ndash; {{ ucfirst($endOfWeek->format('M j, Y')) }}
@@ -46,67 +46,67 @@
                 </button>
 
                 {{-- DUAL-PANEL DATE PICKER POPUP --}}
-                @if($showDatePicker)
-                    <div class="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-2xl p-4 flex flex-col md:flex-row gap-4 min-w-[320px] md:min-w-[490px]"
-                         @click.away="$wire.closeDatePicker()">
-                        {{-- LEFT PANEL: PRESETS --}}
-                        <div class="w-full md:w-36 flex flex-col gap-1 border-b md:border-b-0 md:border-r border-gray-200 pb-3 md:pb-0 md:pr-3 text-xs">
-                            <button wire:click="selectPreset(0)"
-                                    class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === 0 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
-                                This Week
-                            </button>
-                            <button wire:click="selectPreset(-1)"
-                                    class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === -1 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
-                                Last Week
-                            </button>
-                            <button wire:click="selectPreset(-2)"
-                                    class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === -2 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
-                                2 Weeks Ago
-                            </button>
-                            <button wire:click="selectPreset(-3)"
-                                    class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === -3 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
-                                3 Weeks Ago
-                            </button>
-                            <button wire:click="selectPreset(1)"
-                                    class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === 1 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
-                                Next Week
-                            </button>
+                <div x-show="openDatePicker"
+                     x-cloak
+                     @click.away="openDatePicker = false"
+                     class="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-2xl p-4 flex flex-col md:flex-row gap-4 min-w-[320px] md:min-w-[490px]">
+                    {{-- LEFT PANEL: PRESETS --}}
+                    <div class="w-full md:w-36 flex flex-col gap-1 border-b md:border-b-0 md:border-r border-gray-200 pb-3 md:pb-0 md:pr-3 text-xs">
+                        <button type="button" wire:click="selectPreset(0); $wire.showDatePicker = false;" @click="openDatePicker = false"
+                                class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === 0 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
+                            This Week
+                        </button>
+                        <button type="button" wire:click="selectPreset(-1); $wire.showDatePicker = false;" @click="openDatePicker = false"
+                                class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === -1 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
+                            Last Week
+                        </button>
+                        <button type="button" wire:click="selectPreset(-2); $wire.showDatePicker = false;" @click="openDatePicker = false"
+                                class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === -2 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
+                            2 Weeks Ago
+                        </button>
+                        <button type="button" wire:click="selectPreset(-3); $wire.showDatePicker = false;" @click="openDatePicker = false"
+                                class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === -3 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
+                            3 Weeks Ago
+                        </button>
+                        <button type="button" wire:click="selectPreset(1); $wire.showDatePicker = false;" @click="openDatePicker = false"
+                                class="text-left px-3 py-2 rounded font-semibold transition {{ $weekOffset === 1 ? 'bg-[#d0ebfc] text-[#0077c8]' : 'text-gray-700 hover:bg-gray-50' }}">
+                            Next Week
+                        </button>
+                    </div>
+
+                    {{-- RIGHT PANEL: MINI CALENDAR --}}
+                    <div class="flex-1 text-xs">
+                        <div class="flex items-center justify-between mb-2">
+                            <button type="button" wire:click="prevMonth" class="px-2 py-1 text-gray-500 hover:text-black font-bold">&lsaquo;</button>
+                            <span class="font-bold text-gray-700">{{ $calMonthTitle }}</span>
+                            <button type="button" wire:click="nextMonth" class="px-2 py-1 text-gray-500 hover:text-black font-bold">&rsaquo;</button>
                         </div>
 
-                        {{-- RIGHT PANEL: MINI CALENDAR --}}
-                        <div class="flex-1 text-xs">
-                            <div class="flex items-center justify-between mb-2">
-                                <button type="button" wire:click="prevMonth" class="px-2 py-1 text-gray-500 hover:text-black font-bold">&lsaquo;</button>
-                                <span class="font-bold text-gray-700">{{ $calMonthTitle }}</span>
-                                <button type="button" wire:click="nextMonth" class="px-2 py-1 text-gray-500 hover:text-black font-bold">&rsaquo;</button>
-                            </div>
-
-                            <table class="w-full text-center">
-                                <thead>
-                                <tr class="text-gray-400 font-semibold text-[10px]">
-                                    @foreach(range(0,6) as $dIdx)
-                                        <th class="py-1">{{ strtoupper($startOfWeek->copy()->addDays($dIdx)->format('D')[0]) }}</th>
+                        <table class="w-full text-center">
+                            <thead>
+                            <tr class="text-gray-400 font-semibold text-[10px]">
+                                @foreach(range(0,6) as $dIdx)
+                                    <th class="py-1">{{ strtoupper($startOfWeek->copy()->addDays($dIdx)->format('D')[0]) }}</th>
+                                @endforeach
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($calendarWeeks as $week)
+                                <tr class="cursor-pointer hover:bg-blue-50/50">
+                                    @foreach($week as $dayItem)
+                                        <td wire:click="selectDateFromCalendar('{{ $dayItem['date'] }}'); $wire.showDatePicker = false;" @click="openDatePicker = false"
+                                            class="py-1.5 rounded transition text-center
+                                                {{ $dayItem['is_selected'] ? 'bg-[#0077c8] text-white font-bold' : ($dayItem['is_current_month'] ? 'text-gray-700 hover:bg-blue-100' : 'text-gray-300') }}
+                                                {{ $dayItem['is_today'] && !$dayItem['is_selected'] ? 'ring-1 ring-[#0077c8] font-bold' : '' }}">
+                                            {{ $dayItem['day'] }}
+                                        </td>
                                     @endforeach
                                 </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($calendarWeeks as $week)
-                                    <tr class="cursor-pointer hover:bg-blue-50/50">
-                                        @foreach($week as $dayItem)
-                                            <td wire:click="selectDateFromCalendar('{{ $dayItem['date'] }}')"
-                                                class="py-1.5 rounded transition text-center
-                                                    {{ $dayItem['is_selected'] ? 'bg-[#0077c8] text-white font-bold' : ($dayItem['is_current_month'] ? 'text-gray-700 hover:bg-blue-100' : 'text-gray-300') }}
-                                                    {{ $dayItem['is_today'] && !$dayItem['is_selected'] ? 'ring-1 ring-[#0077c8] font-bold' : '' }}">
-                                                {{ $dayItem['day'] }}
-                                            </td>
-                                        @endforeach
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                            </table>
-                        </div>
+                            @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                @endif
+                </div>
             </div>
 
             <button wire:click="thisWeek" class="text-xs text-cs-blue hover:underline">Reset</button>
@@ -117,14 +117,34 @@
             <button type="button" onclick="window.print()"
                     class="text-gray-500 hover:text-gray-800 text-lg" title="Print">&#128424;</button>
 
-            {{-- Timezone Trigger (dispatches to global NavbarClock modal) --}}
-            <button type="button"
-                    wire:click="$dispatch('open-timezone-modal')"
-                    @click="$dispatch('open-timezone-modal'); window.Livewire && window.Livewire.dispatch('open-timezone-modal'); window.dispatchEvent(new CustomEvent('open-timezone-modal'))"
-                    class="px-2.5 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-xs sm:text-sm text-gray-700 hover:text-[#005a9c] flex items-center gap-1 font-medium transition cursor-pointer shadow-2xs"
-                    title="Click to view or switch timezone (Current: {{ $currencyOrTz }})">
-                <span class="font-semibold">{{ $currencyOrTz }}</span> <span class="text-[9px] text-gray-500">&#9660;</span>
-            </button>
+            {{-- Interactive Timezone Selector Dropdown & Modal Trigger --}}
+            <div class="relative">
+                <button type="button"
+                        @click="openTzDropdown = !openTzDropdown"
+                        class="px-2.5 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-xs sm:text-sm text-gray-700 hover:text-[#005a9c] flex items-center gap-1 font-medium transition cursor-pointer shadow-2xs"
+                        title="Click to view or switch timezone (Current: {{ $currencyOrTz }})">
+                    <span class="font-semibold">{{ $currencyOrTz }}</span> <span class="text-[9px] text-gray-500">&#9660;</span>
+                </button>
+
+                <div x-show="openTzDropdown"
+                     x-cloak
+                     @click.away="openTzDropdown = false"
+                     class="absolute right-0 top-full mt-1.5 z-50 bg-white border border-gray-200 rounded-lg shadow-xl py-1.5 w-52 text-xs">
+                    <div class="px-3 py-1 text-[10px] uppercase font-bold text-gray-400 border-b border-gray-100">Display Timezone</div>
+                    <button type="button"
+                            @click="openTzDropdown = false; window.dispatchEvent(new CustomEvent('open-timezone-modal'))"
+                            class="w-full text-left px-3 py-1.5 text-gray-700 hover:bg-blue-50 hover:text-[#005a9c] flex items-center justify-between font-medium">
+                        <span>Current: <strong>{{ $currencyOrTz }}</strong></span>
+                        <span class="text-[10px] text-gray-400">Change</span>
+                    </button>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <button type="button"
+                            @click="openTzDropdown = false; window.dispatchEvent(new CustomEvent('open-timezone-modal'))"
+                            class="w-full text-left px-3 py-1.5 text-[#005a9c] hover:bg-blue-50 font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock-rotate-left text-[11px]"></i> Open Timezone Selector...
+                    </button>
+                </div>
+            </div>
 
             {{-- Employees filter --}}
             <div class="relative">

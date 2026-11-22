@@ -921,10 +921,10 @@
                         </a>
                     @endif
 
-                    <!-- 7. Super Admin Dropdown -->
-                    @if(Auth::user()->isAdmin())
+                    <!-- 7. Super Admin Dedicated Module (Exclusively for Super Admins) -->
+                    @if(Auth::user()->isSuperAdmin())
                         <div class="nav-dropdown">
-                            <a href="#" class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition text-amber-300 font-bold {{ request()->routeIs('executive.*') || request()->routeIs('mail.*') || request()->routeIs('notifications.log') || request()->routeIs('webmail') || request()->routeIs('admin.access-management') ? ($isModern ? 'nav-pill-link active-link' : 'border-b-2 border-amber-400 font-bold') : ($isModern ? 'nav-pill-link' : '') }}">
+                            <a href="#" class="flex items-center gap-1.5 py-1 hover:text-gray-200 transition text-amber-300 font-bold {{ request()->routeIs('executive.*') || request()->routeIs('mail.*') || request()->routeIs('notifications.log') || request()->routeIs('webmail') || request()->routeIs('admin.access-management') ? 'border-b-2 border-amber-400 font-bold' : '' }}">
                                 <span class="bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px] text-amber-300 font-extrabold tracking-wide uppercase mr-0.5">Super</span>
                                 <span>Admin</span> <span class="text-[8px]">&#9660;</span>
                             </a>
@@ -958,25 +958,21 @@
                                         <i class="fa-solid fa-bell text-xs text-amber-500"></i> Notifications History Log
                                     </a>
                                 @endif
-                                @if(auth()->user()?->canAccessAdmin() || auth()->user()?->isManager())
-                                    <a href="{{ route('notification.settings') }}" wire:navigate class="dd-link flex items-center gap-2">
-                                        <i class="fa-solid fa-bell-concierge text-xs text-sky-500"></i> Notification Management
-                                    </a>
-                                @endif
+                                <a href="{{ route('notification.settings') }}" wire:navigate class="dd-link flex items-center gap-2">
+                                    <i class="fa-solid fa-bell-concierge text-xs text-sky-500"></i> Notification Management
+                                </a>
 
-                                @if(auth()->user()?->isSuperAdmin())
-                                    <div class="dd-divider"></div>
-                                    <div class="dd-group-title">Archive & System</div>
-                                    <a href="{{ route('admin.inactive-records') }}" wire:navigate class="dd-link flex items-center gap-2 text-rose-600 font-semibold">
-                                        <i class="fa-solid fa-box-archive text-xs text-rose-500"></i> Inactive Records Hub
-                                    </a>
-                                    <a href="{{ route('admin.data-shedding') }}" wire:navigate class="dd-link flex items-center gap-2">
-                                        <i class="fa-solid fa-broom-ball text-xs text-rose-500"></i> Data Shedding (Production)
-                                    </a>
-                                    <a href="{{ route('admin.company-settings') }}" wire:navigate class="dd-link flex items-center gap-2">
-                                        <i class="fa-solid fa-sliders text-xs text-gray-500"></i> Master Configurations
-                                    </a>
-                                @endif
+                                <div class="dd-divider"></div>
+                                <div class="dd-group-title">Archive & System</div>
+                                <a href="{{ route('admin.inactive-records') }}" wire:navigate class="dd-link flex items-center gap-2 text-rose-600 font-semibold">
+                                    <i class="fa-solid fa-box-archive text-xs text-rose-500"></i> Inactive Records Hub
+                                </a>
+                                <a href="{{ route('admin.data-shedding') }}" wire:navigate class="dd-link flex items-center gap-2">
+                                    <i class="fa-solid fa-broom-ball text-xs text-rose-500"></i> Data Shedding (Production)
+                                </a>
+                                <a href="{{ route('admin.company-settings') }}" wire:navigate class="dd-link flex items-center gap-2">
+                                    <i class="fa-solid fa-sliders text-xs text-gray-500"></i> Master Configurations
+                                </a>
                             </div>
                         </div>
                     @endif
@@ -994,50 +990,55 @@
                     <span>&#8681;</span> Install App
                 </button>
 
-                <!-- ClockShark / Modern "+ New" Quick Action Dropdown -->
-                <div class="nav-dropdown hidden sm:block">
-                    <button type="button" class="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold text-white {{ $isModern ? 'modern-action-btn' : 'bg-[#1f76d1] hover:bg-blue-600' }} shadow-xs transition">
-                        + New
-                    </button>
-                    <div class="dd-menu w-44 shadow-xl">
-                        @if(\App\Models\CompanySetting::isPageActive('work_customers') && Auth::user()->canView('customers'))
-                            <a href="{{ route('work.customers') }}" wire:navigate class="dd-link">
-                                @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-building-user"></i></span> @endif
-                                <span>Customer</span>
-                            </a>
-                        @endif
-                        @if(\App\Models\CompanySetting::isPageActive('work_jobs') && Auth::user()->canView('jobs'))
-                            <a href="{{ route('work.jobs') }}" wire:navigate class="dd-link">
-                                @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-briefcase"></i></span> @endif
-                                <span>Job</span>
-                            </a>
-                        @endif
-                        @if(\App\Models\CompanySetting::isPageActive('work_tasks') && Auth::user()->canView('tasks'))
-                            <a href="{{ route('work.tasks') }}" wire:navigate class="dd-link">
-                                @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-list-check"></i></span> @endif
-                                <span>Task</span>
-                            </a>
-                        @endif
-                        @if(\App\Models\CompanySetting::isPageActive('work_quotes') && Auth::user()->canView('quotes'))
-                            <a href="{{ route('work.quotes') }}" wire:navigate class="dd-link">
-                                @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-file-invoice-dollar"></i></span> @endif
-                                <span>Quote</span>
-                            </a>
-                        @endif
-                        @if(\App\Models\CompanySetting::isPageActive('work_invoices') && Auth::user()->canView('invoices'))
-                            <a href="{{ route('work.invoices') }}" wire:navigate class="dd-link">
-                                @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-receipt"></i></span> @endif
-                                <span>Invoice</span>
-                            </a>
-                        @endif
-                        @if(\App\Models\CompanySetting::isPageActive('admin_employees') && Auth::user()->canAccessAdmin())
-                            <a href="{{ route('admin.employees') }}" wire:navigate class="dd-link">
-                                @if($isModern) <span class="modern-icon-badge"><i class="fa-solid fa-user-plus"></i></span> @endif
-                                <span>Employee</span>
-                            </a>
-                        @endif
+                <!-- ClockShark "+ New" Quick Action Dropdown -->
+                @php
+                    $canAddCustomer = \App\Models\CompanySetting::isPageActive('work_customers') && Auth::user()->canEdit('customers');
+                    $canAddJob      = \App\Models\CompanySetting::isPageActive('work_jobs') && Auth::user()->canEdit('jobs');
+                    $canAddTask     = \App\Models\CompanySetting::isPageActive('work_tasks') && Auth::user()->canEdit('tasks');
+                    $canAddQuote    = \App\Models\CompanySetting::isPageActive('work_quotes') && Auth::user()->canEdit('quotes');
+                    $canAddInvoice  = \App\Models\CompanySetting::isPageActive('work_invoices') && Auth::user()->canEdit('invoices');
+                    $canAddEmployee = \App\Models\CompanySetting::isPageActive('admin_employees') && (Auth::user()->isAdmin() || Auth::user()->isHrManager());
+                    $hasAnyNewAction = $canAddCustomer || $canAddJob || $canAddTask || $canAddQuote || $canAddInvoice || $canAddEmployee;
+                @endphp
+                @if($hasAnyNewAction)
+                    <div class="nav-dropdown hidden sm:block">
+                        <button type="button" class="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold text-white bg-[#1f76d1] hover:bg-blue-600 shadow-xs transition">
+                            + New
+                        </button>
+                        <div class="dd-menu w-44 shadow-xl">
+                            @if($canAddCustomer)
+                                <a href="{{ route('work.customers') }}" wire:navigate class="dd-link">
+                                    <span>Customer</span>
+                                </a>
+                            @endif
+                            @if($canAddJob)
+                                <a href="{{ route('work.jobs') }}" wire:navigate class="dd-link">
+                                    <span>Job</span>
+                                </a>
+                            @endif
+                            @if($canAddTask)
+                                <a href="{{ route('work.tasks') }}" wire:navigate class="dd-link">
+                                    <span>Task</span>
+                                </a>
+                            @endif
+                            @if($canAddQuote)
+                                <a href="{{ route('work.quotes') }}" wire:navigate class="dd-link">
+                                    <span>Quote</span>
+                                </a>
+                            @endif
+                            @if($canAddInvoice)
+                                <a href="{{ route('work.invoices') }}" wire:navigate class="dd-link">
+                                    <span>Invoice</span>
+                                </a>
+                            @endif
+                            @if($canAddEmployee)
+                                <a href="{{ route('admin.employees') }}" wire:navigate class="dd-link">
+                                    <span>Employee</span>
+                                </a>
+                            @endif
+                        </div>
                     </div>
-                </div>
+                @endif
 
                 <!-- 1. Search Icon / Quick Search Pill -->
                 <button @click="showSearchModal = true" type="button"
@@ -1322,44 +1323,12 @@
                     </div>
                 @endif
 
-                <!-- Webmail & Logs -->
-                @php
-                    $showMobileWebmail = \App\Models\CompanySetting::isPageActive('webmail');
-                    $showMobileMailLogs = \App\Models\CompanySetting::isPageActive('mail_logs');
-                    $showMobileNotifs = \App\Models\CompanySetting::isPageActive('notifications_log');
-                    $hasMobileMail = $showMobileWebmail || $showMobileMailLogs || $showMobileNotifs;
-                @endphp
-                @if($hasMobileMail)
-                    <div class="space-y-1">
-                        <div class="text-[10px] text-gray-400 px-3 uppercase">Mail & Alerts</div>
-                        @if($showMobileWebmail)
-                            <a href="{{ route('webmail') }}" wire:navigate @click="mobileDrawerOpen = false"
-                               class="flex items-center gap-3 py-2 px-3 rounded hover:bg-blue-50 hover:text-[#005a9c] text-gray-800">
-                                <i class="fa-solid fa-envelope text-sky-600"></i> Webmail
-                            </a>
-                        @endif
-                        @if($showMobileMailLogs)
-                            <a href="{{ route('mail.logs') }}" wire:navigate @click="mobileDrawerOpen = false"
-                               class="flex items-center gap-3 py-2 px-3 rounded hover:bg-blue-50 hover:text-[#005a9c] text-gray-800">
-                                <i class="fa-solid fa-envelope-open-text text-indigo-600"></i> Mail Log
-                            </a>
-                        @endif
-                        @if($showMobileNotifs)
-                            <a href="{{ route('notifications.log') }}" wire:navigate @click="mobileDrawerOpen = false"
-                               class="flex items-center gap-3 py-2 px-3 rounded hover:bg-blue-50 hover:text-[#005a9c] text-gray-800">
-                                <i class="fa-solid fa-bell text-amber-500"></i> Notifications Log
-                            </a>
-                        @endif
-                    </div>
-                @endif
-
                 <!-- Admin Management -->
                 @if(Auth::user()->canAccessAdmin())
                     @php
                         $canMobileAdminEmployees = \App\Models\CompanySetting::isPageActive('admin_employees');
                         $canMobileAdminDepartments = \App\Models\CompanySetting::isPageActive('admin_departments');
                         $canMobileAdminLocations = \App\Models\CompanySetting::isPageActive('admin_locations');
-                        $canMobileAdminUam = \App\Models\CompanySetting::isPageActive('admin_access_management');
                     @endphp
                     <div class="space-y-1">
                         <div class="text-[10px] text-gray-400 px-3 uppercase">Administration</div>
@@ -1394,10 +1363,12 @@
                     </div>
                 @endif
 
-                <!-- Super Admin Management (Mobile) -->
-                @if(Auth::user()->isAdmin())
-                    <div class="space-y-1">
-                        <div class="text-[10px] text-amber-500 font-bold px-3 uppercase tracking-wider">Super Admin</div>
+                <!-- Super Admin Dedicated Module (Mobile - Strictly for Super Admins) -->
+                @if(Auth::user()->isSuperAdmin())
+                    <div class="space-y-1 border-t border-amber-200/50 pt-2">
+                        <div class="text-[10px] text-amber-600 font-extrabold px-3 uppercase tracking-wider flex items-center gap-1">
+                            <span class="bg-amber-100 text-amber-800 px-1 rounded text-[9px]">Super</span> Admin Only
+                        </div>
                         @if(\App\Models\CompanySetting::isPageActive('executive_dashboard'))
                             <a href="{{ route('executive.dashboard') }}" wire:navigate @click="mobileDrawerOpen = false"
                                class="flex items-center gap-3 py-2 px-3 rounded hover:bg-amber-50 hover:text-amber-800 text-gray-800">
@@ -1410,6 +1381,36 @@
                                 <i class="fa-solid fa-shield-halved text-xs text-emerald-500"></i> Access Management (UAM)
                             </a>
                         @endif
+                        @if(\App\Models\CompanySetting::isPageActive('webmail'))
+                            <a href="{{ route('webmail') }}" wire:navigate @click="mobileDrawerOpen = false"
+                               class="flex items-center gap-3 py-2 px-3 rounded hover:bg-amber-50 hover:text-amber-800 text-gray-800">
+                                <i class="fa-solid fa-envelope text-xs text-sky-500"></i> Webmail
+                            </a>
+                        @endif
+                        @if(\App\Models\CompanySetting::isPageActive('mail_logs'))
+                            <a href="{{ route('mail.logs') }}" wire:navigate @click="mobileDrawerOpen = false"
+                               class="flex items-center gap-3 py-2 px-3 rounded hover:bg-amber-50 hover:text-amber-800 text-gray-800">
+                                <i class="fa-solid fa-envelope-open-text text-xs text-purple-500"></i> Mail Delivery Logs
+                            </a>
+                        @endif
+                        @if(\App\Models\CompanySetting::isPageActive('notifications_log'))
+                            <a href="{{ route('notifications.log') }}" wire:navigate @click="mobileDrawerOpen = false"
+                               class="flex items-center gap-3 py-2 px-3 rounded hover:bg-amber-50 hover:text-amber-800 text-gray-800">
+                                <i class="fa-solid fa-bell text-xs text-amber-500"></i> Notifications History Log
+                            </a>
+                        @endif
+                        <a href="{{ route('notification.settings') }}" wire:navigate @click="mobileDrawerOpen = false"
+                           class="flex items-center gap-3 py-2 px-3 rounded hover:bg-amber-50 hover:text-amber-800 text-gray-800">
+                            <i class="fa-solid fa-bell-concierge text-xs text-sky-500"></i> Notification Management
+                        </a>
+                        <a href="{{ route('admin.inactive-records') }}" wire:navigate @click="mobileDrawerOpen = false"
+                           class="flex items-center gap-3 py-2 px-3 rounded hover:bg-amber-50 hover:text-rose-700 text-rose-600 font-semibold">
+                            <i class="fa-solid fa-box-archive text-xs text-rose-500"></i> Inactive Records Hub
+                        </a>
+                        <a href="{{ route('admin.data-shedding') }}" wire:navigate @click="mobileDrawerOpen = false"
+                           class="flex items-center gap-3 py-2 px-3 rounded hover:bg-amber-50 hover:text-rose-700 text-rose-600 font-semibold">
+                            <i class="fa-solid fa-broom-ball text-xs text-rose-500"></i> Data Shedding (Production)
+                        </a>
                     </div>
                 @endif
 
