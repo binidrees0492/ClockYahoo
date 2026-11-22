@@ -290,6 +290,8 @@ class ScheduleDraftRangeCopyAndPublishTest extends TestCase
 
         $today = Carbon::today()->toDateString();
 
+        Carbon::setTestNow(Carbon::today()->setTime(10, 0));
+
         // 1. Create a draft shift for today
         $shift = Schedule::create([
             'employee_id'   => $employee->id,
@@ -333,6 +335,8 @@ class ScheduleDraftRangeCopyAndPublishTest extends TestCase
             'assignment_id' => $job->id,
             'task_id'       => $task->id,
         ]);
+
+        Carbon::setTestNow();
     }
 
     public function test_employee_cannot_manually_log_timesheet_when_scheduled_shift_is_draft_until_published(): void

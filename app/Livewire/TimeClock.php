@@ -74,8 +74,9 @@ class TimeClock extends Component
     public function mount()
     {
         $user = Auth::user();
-        $this->assignments = $user ? $user->getAssignedJobs() : Assignment::ongoing()->orderBy('name')->get();
-        $this->tasks       = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
+        $today = Carbon::today()->toDateString();
+        $this->assignments = $user ? $user->getAssignedJobs($today) : Assignment::ongoing()->orderBy('name')->get();
+        $this->tasks       = $user ? $user->getAssignedTasks(null, $today) : Task::ongoing()->orderBy('name')->get();
 
         $this->refreshState();
     }
@@ -102,8 +103,9 @@ class TimeClock extends Component
         $activeTz = $user ? $user->getTimezone() : CompanySetting::getServerTimezone();
         $tzAbbr = $user ? $user->getTimezoneAbbr() : 'UTC';
 
-        $this->assignments = $user ? $user->getAssignedJobs() : Assignment::ongoing()->orderBy('name')->get();
-        $this->tasks       = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
+        $today = Carbon::today()->toDateString();
+        $this->assignments = $user ? $user->getAssignedJobs($today) : Assignment::ongoing()->orderBy('name')->get();
+        $this->tasks       = $user ? $user->getAssignedTasks(null, $today) : Task::ongoing()->orderBy('name')->get();
 
         $log = TimeLog::where('employee_id', Auth::id())
             ->notArchived()
@@ -300,9 +302,12 @@ class TimeClock extends Component
         }
 
         $user = Auth::user();
+        $today = Carbon::today()->toDateString();
+        $now = Carbon::now();
+
         if ($user && $user->isEmployee() && !$user->canAccessAdmin()) {
-            $assignedJobIds = $user->getAssignedJobs()->pluck('id')->toArray();
-            $assignedTaskIds = $user->getAssignedTasks()->pluck('id')->toArray();
+            $assignedJobIds = $user->getAssignedJobs($today)->pluck('id')->toArray();
+            $assignedTaskIds = $user->getAssignedTasks((int) $this->selectedAssignment, $today)->pluck('id')->toArray();
 
             if (!in_array((int) $this->selectedAssignment, $assignedJobIds, true)) {
                 $this->toast('You are only allowed to clock in to jobs assigned to you.', 'error');
@@ -314,19 +319,14 @@ class TimeClock extends Component
             }
         }
 
-        $today = Carbon::today()->toDateString();
         $schedule = \App\Models\Schedule::where('employee_id', Auth::id())
-            ->where(function ($q) {
-                $q->where('status', 'published')->orWhere('is_published', true);
-            })
+            ->published()
             ->whereDate('shift_date', $today)
             ->first();
 
         $hasDraftShiftToday = \App\Models\Schedule::where('employee_id', Auth::id())
             ->whereDate('shift_date', $today)
-            ->where(function ($q) {
-                $q->where('status', 'draft')->orWhere('is_published', false);
-            })
+            ->draft()
             ->exists();
 
         if ($hasDraftShiftToday && !$schedule) {
@@ -337,6 +337,42 @@ class TimeClock extends Component
         if (CompanySetting::get('require_published_schedule', false) && !$schedule) {
             $this->toast('You can only log time if you have a published schedule against your name.', 'error');
             return;
+        }
+
+        $isProfileAssigned = $user && isset($user->permissions['assigned_jobs'])
+            && is_array($user->permissions['assigned_jobs'])
+            && in_array((int)$this->selectedAssignment, array_map('intval', $user->permissions['assigned_jobs']), true);
+
+        $matchingJobSchedule = \App\Models\Schedule::where('employee_id', Auth::id())
+            ->published()
+            ->whereDate('shift_date', $today)
+            ->where('assignment_id', $this->selectedAssignment)
+            ->first();
+
+        if (!$isProfileAssigned || CompanySetting::get('require_published_schedule', false)) {
+            if (!$matchingJobSchedule) {
+                if (!$schedule) {
+                    $this->toast('You do not have a scheduled shift for today. You can only start a log for dates where a shift was assigned to you.', 'error');
+                    return;
+                } else {
+                    $this->toast('The selected job is not assigned to your scheduled shift for today.', 'error');
+                    return;
+                }
+            }
+        }
+
+        if ($matchingJobSchedule) {
+            if ($matchingJobSchedule->task_id && (int)$matchingJobSchedule->task_id !== (int)$this->selectedTask) {
+                $this->toast('The selected task is not assigned to your scheduled shift for today.', 'error');
+                return;
+            }
+
+            if (!$matchingJobSchedule->coversTime($now, 30, 30)) {
+                $startFmt = $matchingJobSchedule->start_carbon ? $matchingJobSchedule->start_carbon->format('g:i A') : 'scheduled start';
+                $endFmt = $matchingJobSchedule->end_carbon ? $matchingJobSchedule->end_carbon->format('g:i A') : 'scheduled end';
+                $this->toast("Your scheduled shift is from {$startFmt} to {$endFmt}. You can only clock in during your scheduled shift date and time.", 'error');
+                return;
+            }
         }
 
         $task = \App\Models\Task::find($this->selectedTask);
@@ -399,10 +435,11 @@ class TimeClock extends Component
     public function updatedSelectedAssignment($assignmentId)
     {
         $user = Auth::user();
+        $today = Carbon::today()->toDateString();
         if ($assignmentId) {
-            $this->tasks = $user ? $user->getAssignedTasks((int) $assignmentId) : Task::ongoing()->where('assignment_id', $assignmentId)->orderBy('name')->get();
+            $this->tasks = $user ? $user->getAssignedTasks((int) $assignmentId, $today) : Task::ongoing()->where('assignment_id', $assignmentId)->orderBy('name')->get();
         } else {
-            $this->tasks = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
+            $this->tasks = $user ? $user->getAssignedTasks(null, $today) : Task::ongoing()->orderBy('name')->get();
         }
         $this->selectedTask = null;
     }
@@ -410,10 +447,11 @@ class TimeClock extends Component
     public function updatedSwitchAssignment($assignmentId)
     {
         $user = Auth::user();
+        $today = Carbon::today()->toDateString();
         if ($assignmentId) {
-            $this->tasks = $user ? $user->getAssignedTasks((int) $assignmentId) : Task::ongoing()->where('assignment_id', $assignmentId)->orderBy('name')->get();
+            $this->tasks = $user ? $user->getAssignedTasks((int) $assignmentId, $today) : Task::ongoing()->where('assignment_id', $assignmentId)->orderBy('name')->get();
         } else {
-            $this->tasks = $user ? $user->getAssignedTasks() : Task::ongoing()->orderBy('name')->get();
+            $this->tasks = $user ? $user->getAssignedTasks(null, $today) : Task::ongoing()->orderBy('name')->get();
         }
         $this->switchTask = null;
     }
@@ -581,9 +619,12 @@ class TimeClock extends Component
         ]);
 
         $user = Auth::user();
+        $today = Carbon::today()->toDateString();
+        $now = Carbon::now();
+
         if ($user && $user->isEmployee() && !$user->canAccessAdmin()) {
-            $assignedJobIds = $user->getAssignedJobs()->pluck('id')->toArray();
-            $assignedTaskIds = $user->getAssignedTasks()->pluck('id')->toArray();
+            $assignedJobIds = $user->getAssignedJobs($today)->pluck('id')->toArray();
+            $assignedTaskIds = $user->getAssignedTasks((int) $this->switchAssignment, $today)->pluck('id')->toArray();
 
             if (!in_array((int) $this->switchAssignment, $assignedJobIds, true)) {
                 $this->toast('You are only allowed to switch to jobs assigned to you.', 'error');
@@ -591,6 +632,37 @@ class TimeClock extends Component
             }
             if (!in_array((int) $this->switchTask, $assignedTaskIds, true)) {
                 $this->toast('You are only allowed to switch to tasks assigned to you.', 'error');
+                return;
+            }
+        }
+
+        $isProfileAssigned = $user && isset($user->permissions['assigned_jobs'])
+            && is_array($user->permissions['assigned_jobs'])
+            && in_array((int)$this->switchAssignment, array_map('intval', $user->permissions['assigned_jobs']), true);
+
+        $matchingJobSchedule = \App\Models\Schedule::where('employee_id', Auth::id())
+            ->published()
+            ->whereDate('shift_date', $today)
+            ->where('assignment_id', $this->switchAssignment)
+            ->first();
+
+        if (!$isProfileAssigned || CompanySetting::get('require_published_schedule', false)) {
+            if (!$matchingJobSchedule) {
+                $this->toast('The selected job is not assigned to your scheduled shift for today.', 'error');
+                return;
+            }
+        }
+
+        if ($matchingJobSchedule) {
+            if ($matchingJobSchedule->task_id && (int)$matchingJobSchedule->task_id !== (int)$this->switchTask) {
+                $this->toast('The selected task is not assigned to your scheduled shift for today.', 'error');
+                return;
+            }
+
+            if (!$matchingJobSchedule->coversTime($now, 30, 30)) {
+                $startFmt = $matchingJobSchedule->start_carbon ? $matchingJobSchedule->start_carbon->format('g:i A') : 'scheduled start';
+                $endFmt = $matchingJobSchedule->end_carbon ? $matchingJobSchedule->end_carbon->format('g:i A') : 'scheduled end';
+                $this->toast("Your scheduled shift is from {$startFmt} to {$endFmt}. You can only switch jobs during your scheduled shift date and time.", 'error');
                 return;
             }
         }

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\ScheduleBoard;
 use App\Livewire\TimeClock;
+use App\Livewire\Timesheets;
 use App\Models\Assignment;
 use App\Models\CompanySetting;
 use App\Models\Schedule;
@@ -276,5 +277,149 @@ class ScheduleWeekPublishBreakdownAndClockInTaskTest extends TestCase
             ->set('switchTask', null)
             ->call('confirmSwitch')
             ->assertHasErrors(['switchTask' => 'A job cannot be started unless a task is selected too.']);
+    }
+
+    public function test_employee_cannot_log_time_on_unscheduled_days_or_outside_shift_hours(): void
+    {
+        $employee = User::factory()->create(['role' => 'Employee']);
+        $job = Assignment::create(['name' => 'Project Gamma', 'status' => 'active']);
+        $task = Task::create(['name' => 'Masonry', 'assignment_id' => $job->id, 'status' => 'active']);
+
+        // Schedule only on 2026-11-25 (Wednesday) from 09:00 to 17:00
+        Schedule::create([
+            'employee_id'    => $employee->id,
+            'assignment_id'  => $job->id,
+            'task_id'        => $task->id,
+            'shift_date'     => '2026-11-25',
+            'start_time'     => '09:00',
+            'end_time'       => '17:00',
+            'standard_hours' => 8.00,
+            'status'         => 'published',
+            'is_published'   => true,
+        ]);
+
+        $this->actingAs($employee);
+
+        // 1. Dropdown options on scheduled date (2026-11-25) contain Job & Task
+        $tsComponent = Livewire::test(Timesheets::class)
+            ->set('addStartDate', '2026-11-25')
+            ->set('addEndDate', '2026-11-25');
+
+        $assignmentsOnWed = $tsComponent->get('modalAssignments');
+        $this->assertTrue($assignmentsOnWed->contains('id', $job->id));
+
+        // 2. Dropdown options on unscheduled date (2026-11-24) do NOT contain Job
+        $tsComponent->set('addStartDate', '2026-11-24')
+            ->set('addEndDate', '2026-11-24');
+
+        $assignmentsOnTue = $tsComponent->get('modalAssignments');
+        $this->assertFalse($assignmentsOnTue->contains('id', $job->id));
+
+        // 3. Multi-day breakdown defaults only the scheduled day (Wednesday) to enabled
+        $tsComponent->set('addStartDate', '2026-11-23')
+            ->set('addEndDate', '2026-11-27');
+
+        $breakdown = $tsComponent->get('addDaysBreakdown');
+        foreach ($breakdown as $row) {
+            if ($row['date'] === '2026-11-25') {
+                $this->assertTrue($row['enabled'], "Wednesday 2026-11-25 should be enabled");
+                $this->assertEquals(8.00, (float)$row['hours']);
+            } else {
+                $this->assertFalse($row['enabled'], "Day {$row['date']} should be disabled because no shift exists");
+            }
+        }
+
+        // 4. Attempting to log single manual time on unscheduled date (2026-11-24) fails
+        Livewire::test(Timesheets::class)
+            ->set('addAssignment', $job->id)
+            ->set('addTask', $task->id)
+            ->set('addNotes', 'Worked unscheduled day')
+            ->set('addDaysBreakdown', [])
+            ->set('addClockIn', '2026-11-24T09:00')
+            ->set('addClockOut', '2026-11-24T17:00')
+            ->call('saveAdd')
+            ->assertDispatched('toast', message: 'You do not have a scheduled shift for 2026-11-24. You can only log manual time for dates and times where a shift was assigned to you.', type: 'error');
+
+        // 5. Attempting to log manual time on scheduled date outside shift hours (e.g. 19:00 - 22:00) fails
+        Livewire::test(Timesheets::class)
+            ->set('addAssignment', $job->id)
+            ->set('addTask', $task->id)
+            ->set('addNotes', 'Worked overtime shift')
+            ->set('addDaysBreakdown', [])
+            ->set('addClockIn', '2026-11-25T19:00')
+            ->set('addClockOut', '2026-11-25T22:00')
+            ->call('saveAdd')
+            ->assertDispatched('toast', type: 'error');
+
+        // 6. Logging manual time within scheduled shift hours (09:00 - 17:00) succeeds
+        Livewire::test(Timesheets::class)
+            ->set('addAssignment', $job->id)
+            ->set('addTask', $task->id)
+            ->set('addNotes', 'Regular shift completed')
+            ->set('addDaysBreakdown', [])
+            ->set('addClockIn', '2026-11-25T09:00')
+            ->set('addClockOut', '2026-11-25T17:00')
+            ->call('saveAdd')
+            ->assertDispatched('toast', message: 'Manual time entry added. Submitted for approval.');
+
+        $this->assertDatabaseHas('tbl_time_logging', [
+            'employee_id'   => $employee->id,
+            'assignment_id' => $job->id,
+            'task_id'       => $task->id,
+            'is_manual'     => 1,
+        ]);
+    }
+
+    public function test_time_clock_blocks_clock_in_outside_scheduled_shift_hours(): void
+    {
+        $employee = User::factory()->create([
+            'role'        => 'Employee',
+            'permissions' => ['allow_web_clock' => true],
+        ]);
+        $job = Assignment::create(['name' => 'Project Delta', 'status' => 'active']);
+        $task = Task::create(['name' => 'Painting', 'assignment_id' => $job->id, 'status' => 'active']);
+
+        $todayStr = Carbon::today()->toDateString();
+
+        Schedule::create([
+            'employee_id'    => $employee->id,
+            'assignment_id'  => $job->id,
+            'task_id'        => $task->id,
+            'shift_date'     => $todayStr,
+            'start_time'     => '09:00',
+            'end_time'       => '17:00',
+            'standard_hours' => 8.00,
+            'status'         => 'published',
+            'is_published'   => true,
+        ]);
+
+        $this->actingAs($employee);
+
+        // Attempting to clock in at 06:00 (too early) is rejected
+        Carbon::setTestNow(Carbon::today()->setTime(6, 0));
+
+        Livewire::test(TimeClock::class)
+            ->set('selectedAssignment', $job->id)
+            ->set('selectedTask', $task->id)
+            ->call('clockIn')
+            ->assertDispatched('toast', message: 'Your scheduled shift is from 9:00 AM to 5:00 PM. You can only clock in during your scheduled shift date and time.', type: 'error');
+
+        // Clock in at 10:00 (during shift) succeeds
+        Carbon::setTestNow(Carbon::today()->setTime(10, 0));
+
+        Livewire::test(TimeClock::class)
+            ->set('selectedAssignment', $job->id)
+            ->set('selectedTask', $task->id)
+            ->call('clockIn')
+            ->assertDispatched('toast', message: 'Clocked in successfully.');
+
+        $this->assertDatabaseHas('tbl_time_logging', [
+            'employee_id'   => $employee->id,
+            'assignment_id' => $job->id,
+            'task_id'       => $task->id,
+            'clock_out'     => null,
+        ]);
+
+        Carbon::setTestNow();
     }
 }

@@ -249,6 +249,7 @@ class TimesheetsView extends Component
         if (strtotime($this->addEndDate) < strtotime($this->addStartDate)) {
             $this->addEndDate = $this->addStartDate;
         }
+        $this->validateAndSyncShiftSelections();
         $this->regenerateDaysBreakdown();
     }
 
@@ -257,7 +258,52 @@ class TimesheetsView extends Component
         if (strtotime($this->addEndDate) < strtotime($this->addStartDate)) {
             $this->addStartDate = $this->addEndDate;
         }
+        $this->validateAndSyncShiftSelections();
         $this->regenerateDaysBreakdown();
+    }
+
+    private function validateAndSyncShiftSelections(): void
+    {
+        if (!$this->addEmployeeId) {
+            return;
+        }
+        $targetUser = User::find($this->addEmployeeId);
+        if (!$targetUser) {
+            return;
+        }
+
+        if ($this->addStartDate && $this->addStartDate === $this->addEndDate && $targetUser->hasSchedules()) {
+            $shifts = \App\Models\Schedule::where('employee_id', $targetUser->id)
+                ->published()
+                ->whereDate('shift_date', $this->addStartDate)
+                ->get();
+
+            if ($shifts->count() === 1) {
+                $shift = $shifts->first();
+                $this->addAssignment = $shift->assignment_id;
+                $this->addTask       = $shift->task_id;
+                if ($shift->start_time) {
+                    $this->addDefaultStartTime = substr($shift->start_time, 0, 5);
+                }
+                if ($shift->end_time) {
+                    $this->addDefaultEndTime = substr($shift->end_time, 0, 5);
+                }
+                if ($shift->standard_hours) {
+                    $this->addStandardShiftHours = (float) $shift->standard_hours;
+                }
+            }
+        }
+
+        $validJobIds = $this->modalAssignments->pluck('id')->toArray();
+        if ($this->addAssignment && !in_array((int) $this->addAssignment, $validJobIds, true)) {
+            $this->addAssignment = null;
+            $this->addTask = null;
+        }
+
+        $validTaskIds = $this->modalTasks->pluck('id')->toArray();
+        if ($this->addTask && !in_array((int) $this->addTask, $validTaskIds, true)) {
+            $this->addTask = null;
+        }
     }
 
     public function updatedAddStandardShiftHours($val)
@@ -319,6 +365,8 @@ class TimesheetsView extends Component
             }
         }
 
+        $targetUser = $this->addEmployeeId ? User::find($this->addEmployeeId) : null;
+        $hasSchedules = $targetUser && $targetUser->hasSchedules();
         $breakdown = [];
         $cur = $start->copy();
         $stdHours = (float) ($this->addStandardShiftHours ?: 8.00);
@@ -327,23 +375,55 @@ class TimesheetsView extends Component
             $dateStr = $cur->toDateString();
             $isWeekend = $cur->isWeekend();
 
+            $matchingSchedule = null;
+            if ($hasSchedules) {
+                $schedQ = \App\Models\Schedule::where('employee_id', $targetUser->id)
+                    ->published()
+                    ->whereDate('shift_date', $dateStr);
+                if ($this->addAssignment) {
+                    $schedQ->where('assignment_id', $this->addAssignment);
+                }
+                $matchingSchedule = $schedQ->first();
+            }
+
             if (isset($existingMap[$dateStr])) {
                 $entry = $existingMap[$dateStr];
                 $entry['day_name']  = $cur->format('l');
                 $entry['formatted'] = $cur->format('M d, Y');
+                if ($hasSchedules) {
+                    $entry['enabled'] = (bool) $matchingSchedule;
+                    if ($matchingSchedule) {
+                        $entry['hours'] = (float) ($matchingSchedule->standard_hours ?: $stdHours);
+                        if ($matchingSchedule->start_time) {
+                            $entry['start_time'] = substr($matchingSchedule->start_time, 0, 5);
+                        }
+                        if ($matchingSchedule->end_time) {
+                            $entry['end_time'] = substr($matchingSchedule->end_time, 0, 5);
+                        }
+                    } else {
+                        $entry['hours'] = 0.00;
+                    }
+                }
                 $breakdown[] = $entry;
             } else {
+                $isEnabled = $hasSchedules ? (bool) $matchingSchedule : !$isWeekend;
+                $hours = $isEnabled ? (float) (($matchingSchedule?->standard_hours) ?: $stdHours) : 0.00;
+                $startTime = ($matchingSchedule && $matchingSchedule->start_time) ? substr($matchingSchedule->start_time, 0, 5) : ($this->addDefaultStartTime ?: '09:00');
+                $endTime   = ($matchingSchedule && $matchingSchedule->end_time) ? substr($matchingSchedule->end_time, 0, 5) : ($this->addDefaultEndTime ?: '17:00');
+                $hasBreak  = ($matchingSchedule && $matchingSchedule->break_minutes > 0);
+                $breakMins = ($matchingSchedule && $matchingSchedule->break_minutes) ? (int)$matchingSchedule->break_minutes : 30;
+
                 $breakdown[] = [
                     'date'          => $dateStr,
                     'day_name'      => $cur->format('l'),
                     'formatted'     => $cur->format('M d, Y'),
                     'is_weekend'    => $isWeekend,
-                    'enabled'       => !$isWeekend,
-                    'hours'         => $isWeekend ? 0.00 : $stdHours,
-                    'has_break'     => false,
-                    'break_minutes' => 30,
-                    'start_time'    => $this->addDefaultStartTime ?: '09:00',
-                    'end_time'      => $this->addDefaultEndTime ?: '17:00',
+                    'enabled'       => $isEnabled,
+                    'hours'         => $hours,
+                    'has_break'     => $hasBreak,
+                    'break_minutes' => $breakMins,
+                    'start_time'    => $startTime,
+                    'end_time'      => $endTime,
                 ];
             }
             $cur->addDay();
@@ -447,7 +527,10 @@ class TimesheetsView extends Component
             return Assignment::where('status', '!=', 'inactive')->ongoing()->orderBy('name')->get();
         }
 
-        return $targetUser->getAssignedJobs();
+        $startDate = $this->addStartDate ?: ($this->addDate ?: Carbon::today()->toDateString());
+        $endDate   = $this->addEndDate ?: $startDate;
+
+        return $targetUser->getAssignedJobs($startDate, null, $endDate);
     }
 
     public function getModalTasksProperty(): \Illuminate\Support\Collection
@@ -465,13 +548,20 @@ class TimesheetsView extends Component
             return collect();
         }
 
-        $assignedTasks = $targetUser->getAssignedTasks($jobId);
+        $startDate = $this->addStartDate ?: ($this->addDate ?: Carbon::today()->toDateString());
+        $endDate   = $this->addEndDate ?: $startDate;
+
+        $assignedTasks = $targetUser->getAssignedTasks($jobId, $startDate, null, $endDate);
         if ($assignedTasks->isNotEmpty()) {
             return $assignedTasks;
         }
 
         if (isset($targetUser->permissions['assigned_tasks']) && is_array($targetUser->permissions['assigned_tasks'])) {
             return $assignedTasks;
+        }
+
+        if ($targetUser->hasSchedules()) {
+            return collect();
         }
 
         return Task::where('status', '!=', 'inactive')
@@ -611,6 +701,42 @@ class TimesheetsView extends Component
                     return;
                 }
 
+                if ($emp->hasSchedules()) {
+                    if (!$publishedSchedule) {
+                        $this->toast("You do not have a scheduled shift for {$targetDate}. You can only log manual time for dates and times where a shift was assigned to you.", 'error');
+                        return;
+                    }
+
+                    $matchingJobSchedule = Schedule::where('employee_id', $this->addEmployeeId)
+                        ->published()
+                        ->whereDate('shift_date', $targetDate)
+                        ->where('assignment_id', $this->addAssignment)
+                        ->first();
+
+                    if (!$matchingJobSchedule) {
+                        $this->toast("The selected job is not assigned to the scheduled shift on {$targetDate}.", 'error');
+                        return;
+                    }
+
+                    if ($matchingJobSchedule->task_id && (int)$matchingJobSchedule->task_id !== (int)$this->addTask) {
+                        $this->toast("The selected task is not assigned to the scheduled shift on {$targetDate}.", 'error');
+                        return;
+                    }
+
+                    $startTime = !empty($day['start_time']) ? $day['start_time'] : ($this->addDefaultStartTime ?: '09:00');
+                    $tempIn = Carbon::parse($targetDate . ' ' . $startTime);
+                    $tempDur = (int) round(((float)$day['hours']) * 60);
+                    $tempBrk = (!empty($day['has_break']) && !empty($day['break_minutes'])) ? (int) $day['break_minutes'] : 0;
+                    $tempOut = $tempIn->copy()->addMinutes($tempDur + $tempBrk);
+
+                    if (!$matchingJobSchedule->coversTimeRange($tempIn, $tempOut, 30, 60)) {
+                        $startFmt = $matchingJobSchedule->start_carbon ? $matchingJobSchedule->start_carbon->format('g:i A') : 'scheduled start';
+                        $endFmt = $matchingJobSchedule->end_carbon ? $matchingJobSchedule->end_carbon->format('g:i A') : 'scheduled end';
+                        $this->toast("Logged time for {$targetDate} ({$tempIn->format('g:i A')} - {$tempOut->format('g:i A')}) falls outside the scheduled shift ({$startFmt} - {$endFmt}).", 'error');
+                        return;
+                    }
+                }
+
                 $startTime = !empty($day['start_time']) ? $day['start_time'] : ($this->addDefaultStartTime ?: '09:00');
                 $in = Carbon::parse($targetDate . ' ' . $startTime);
 
@@ -735,6 +861,36 @@ class TimesheetsView extends Component
         if (CompanySetting::get('require_published_schedule', false) && !$publishedSchedule) {
             $this->toast('You can only log time if you have a published schedule against your name.', 'error');
             return;
+        }
+
+        if ($emp->hasSchedules()) {
+            if (!$publishedSchedule) {
+                $this->toast("You do not have a scheduled shift for {$targetDate}. You can only log manual time for dates and times where a shift was assigned to you.", 'error');
+                return;
+            }
+
+            $matchingJobSchedule = Schedule::where('employee_id', $this->addEmployeeId)
+                ->published()
+                ->whereDate('shift_date', $targetDate)
+                ->where('assignment_id', $this->addAssignment)
+                ->first();
+
+            if (!$matchingJobSchedule) {
+                $this->toast("The selected job is not assigned to the scheduled shift on {$targetDate}.", 'error');
+                return;
+            }
+
+            if ($matchingJobSchedule->task_id && (int)$matchingJobSchedule->task_id !== (int)$this->addTask) {
+                $this->toast("The selected task is not assigned to the scheduled shift on {$targetDate}.", 'error');
+                return;
+            }
+
+            if (!$matchingJobSchedule->coversTimeRange($in, $out, 30, 60)) {
+                $startFmt = $matchingJobSchedule->start_carbon ? $matchingJobSchedule->start_carbon->format('g:i A') : 'scheduled start';
+                $endFmt = $matchingJobSchedule->end_carbon ? $matchingJobSchedule->end_carbon->format('g:i A') : 'scheduled end';
+                $this->toast("Logged time for {$targetDate} ({$in->format('g:i A')} - {$out->format('g:i A')}) falls outside the scheduled shift ({$startFmt} - {$endFmt}).", 'error');
+                return;
+            }
         }
 
         $authUser = Auth::user();

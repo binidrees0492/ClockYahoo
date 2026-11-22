@@ -445,23 +445,51 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
         return (bool) ($this->permissions['allow_web_clock'] ?? true);
     }
 
-    public function getAssignedJobs()
+    public function hasSchedules(): bool
+    {
+        return Schedule::where('employee_id', $this->id)->exists();
+    }
+
+    public function getAssignedJobs(?string $date = null, ?string $time = null, ?string $endDate = null)
     {
         if ($this->isAdmin() || $this->isHrManager() || $this->isManager()) {
             return Assignment::where('status', '!=', 'inactive')->ongoing()->orderBy('name')->get();
         }
+
+        $hasSchedules = $this->hasSchedules();
 
         $assignedIds = [];
         if (isset($this->permissions['assigned_jobs']) && is_array($this->permissions['assigned_jobs'])) {
             $assignedIds = array_map('intval', $this->permissions['assigned_jobs']);
         }
 
-        // Also include jobs assigned to the employee via schedules
-        $scheduledJobIds = Schedule::where('employee_id', $this->id)
+        // Include jobs assigned to the employee via published schedules
+        $schedQuery = Schedule::where('employee_id', $this->id)
             ->whereNotNull('assignment_id')
-            ->pluck('assignment_id')
-            ->map(fn($id) => (int)$id)
-            ->toArray();
+            ->published();
+
+        if ($date !== null) {
+            if ($endDate !== null && $endDate !== $date) {
+                $schedQuery->whereBetween('shift_date', [min($date, $endDate), max($date, $endDate)]);
+            } else {
+                $schedQuery->whereDate('shift_date', $date);
+            }
+        }
+
+        $schedules = $schedQuery->get();
+
+        if ($time !== null && $date !== null) {
+            $schedules = $schedules->filter(function ($s) use ($date, $time) {
+                try {
+                    $dt = \Carbon\Carbon::parse($date . ' ' . $time);
+                    return $s->coversTime($dt);
+                } catch (\Throwable $e) {
+                    return true;
+                }
+            });
+        }
+
+        $scheduledJobIds = $schedules->pluck('assignment_id')->map(fn($id) => (int)$id)->all();
 
         $allIds = array_values(array_unique(array_filter(array_merge($assignedIds, $scheduledJobIds))));
 
@@ -484,33 +512,73 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
         return null;
     }
 
-    public function getAssignedTasks(?int $jobId = null)
+    public function getAssignedTasks(?int $jobId = null, ?string $date = null, ?string $time = null, ?string $endDate = null)
     {
         $query = Task::where('status', '!=', 'inactive')->ongoing();
 
         if ($jobId !== null) {
-            $query->where('assignment_id', $jobId);
+            $query->where(function ($q) use ($jobId) {
+                $q->where('assignment_id', $jobId)->orWhereNull('assignment_id');
+            });
         }
 
         if ($this->isAdmin() || $this->isHrManager() || $this->isManager()) {
             return $query->orderBy('name')->get();
         }
 
+        $hasSchedules = $this->hasSchedules();
+
         $assignedIds = [];
         if (isset($this->permissions['assigned_tasks']) && is_array($this->permissions['assigned_tasks'])) {
             $assignedIds = array_map('intval', $this->permissions['assigned_tasks']);
         }
 
-        // Also include tasks assigned to the employee via schedules
-        $scheduledTaskIds = Schedule::where('employee_id', $this->id)
+        // Include tasks assigned to the employee via published schedules
+        $schedQuery = Schedule::where('employee_id', $this->id)
             ->whereNotNull('task_id')
-            ->pluck('task_id')
-            ->map(fn($id) => (int)$id)
-            ->toArray();
+            ->published();
+
+        if ($jobId !== null) {
+            $schedQuery->where(function ($q) use ($jobId) {
+                $q->where('assignment_id', $jobId)->orWhereNull('assignment_id');
+            });
+        }
+
+        if ($date !== null) {
+            if ($endDate !== null && $endDate !== $date) {
+                $schedQuery->whereBetween('shift_date', [min($date, $endDate), max($date, $endDate)]);
+            } else {
+                $schedQuery->whereDate('shift_date', $date);
+            }
+        }
+
+        $schedules = $schedQuery->get();
+
+        if ($time !== null && $date !== null) {
+            $schedules = $schedules->filter(function ($s) use ($date, $time) {
+                try {
+                    $dt = \Carbon\Carbon::parse($date . ' ' . $time);
+                    return $s->coversTime($dt);
+                } catch (\Throwable $e) {
+                    return true;
+                }
+            });
+        }
+
+        $scheduledTaskIds = $schedules->pluck('task_id')->map(fn($id) => (int)$id)->all();
 
         $allIds = array_values(array_unique(array_filter(array_merge($assignedIds, $scheduledTaskIds))));
 
         if (empty($allIds)) {
+            if (isset($this->permissions['assigned_tasks']) && is_array($this->permissions['assigned_tasks'])) {
+                return Task::whereRaw('1 = 0')->get();
+            }
+            if ($date !== null && $hasSchedules) {
+                return Task::whereRaw('1 = 0')->get();
+            }
+            if ($jobId !== null) {
+                return $query->orderBy('name')->get();
+            }
             return Task::whereRaw('1 = 0')->get();
         }
 
