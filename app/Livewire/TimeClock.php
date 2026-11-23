@@ -108,6 +108,10 @@ class TimeClock extends Component
         $this->assignments = $user ? $user->getAssignedJobs($today) : Assignment::ongoing()->orderBy('name')->get();
         $this->tasks       = $user ? $user->getAssignedTasks(null, $today) : Task::ongoing()->orderBy('name')->get();
 
+        if ($user) {
+            \App\Services\TimeLogComplianceService::enforceAutoClockOut($user);
+        }
+
         $log = TimeLog::where('employee_id', Auth::id())
             ->notArchived()
             ->whereNull('clock_out')
@@ -291,6 +295,10 @@ class TimeClock extends Component
             $this->addError('selectedTask', 'The selected task does not belong to this job.');
             $this->toast('The selected task does not belong to the selected job.', 'error');
             return;
+        }
+
+        if (Auth::check()) {
+            \App\Services\TimeLogComplianceService::enforceAutoClockOut(Auth::user());
         }
 
         $existing = TimeLog::where('employee_id', Auth::id())

@@ -157,8 +157,8 @@ class TimeLogComplianceService
 
         if ($schedule) {
             // Check scheduled start and end
-            $scheduledStart = Carbon::parse($logDate . ' ' . $schedule->start_time);
-            $scheduledEnd   = Carbon::parse($logDate . ' ' . $schedule->end_time);
+            $scheduledStart = Carbon::parse($logDate . ' ' . self::extractTimeOnly($schedule->start_time));
+            $scheduledEnd   = Carbon::parse($logDate . ' ' . self::extractTimeOnly($schedule->end_time));
 
             // Handle overnight shifts spanning past midnight
             if ($scheduledEnd->lte($scheduledStart)) {
@@ -243,7 +243,12 @@ class TimeLogComplianceService
         $evaluation = self::evaluateUnusualActivity($log);
         if ($evaluation['is_unusual']) {
             $log->is_unusual = true;
-            $log->unusual_reason = $evaluation['reason'];
+            $existingReason = $log->unusual_reason;
+            if ($existingReason && !str_contains($existingReason, $evaluation['reason'])) {
+                $log->unusual_reason = $existingReason . ' | ' . $evaluation['reason'];
+            } elseif (!$existingReason) {
+                $log->unusual_reason = $evaluation['reason'];
+            }
             $log->saveQuietly();
         }
 
@@ -372,5 +377,200 @@ class TimeLogComplianceService
                 Log::warning("Failed to notify stakeholder of assigned shift: " . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Enforce automatic clock-out rules on open time logs:
+     * 1. Rule A (New Day Shift Commencement):
+     *    If an employee is already clocked in and a new day shift commences,
+     *    auto clock out (with note "auto clocked out") before commencement of the new day shift,
+     *    and mark as unusual activity.
+     * 2. Rule B (Not allowed to track beyond assigned hours):
+     *    If an employee is not allowed to track beyond assigned hours,
+     *    auto clock out by the end of the assigned shift time (with note "auto clocked out").
+     */
+    public static function enforceAutoClockOut(?User $user = null): array
+    {
+        $query = TimeLog::whereNull('clock_out')
+            ->where('status', '!=', 'completed')
+            ->notArchived();
+
+        if ($user) {
+            $query->where('employee_id', $user->id);
+        }
+
+        $openLogs = $query->with(['employee', 'assignment', 'task'])->get();
+        $processed = [];
+
+        foreach ($openLogs as $log) {
+            $employee = $log->employee;
+            if (!$employee) continue;
+
+            $empTz = $employee->getTimezone() ?: CompanySetting::getServerTimezone();
+            $nowUtc = Carbon::now('UTC');
+            $clockInUtc = $log->getClockInCarbon() ?: Carbon::parse($log->clock_in, 'UTC');
+            $clockInLocal = $clockInUtc->copy()->setTimezone($empTz);
+            $nowLocal = $nowUtc->copy()->setTimezone($empTz);
+
+            $clockInDate = $clockInLocal->toDateString();
+            $todayDate = $nowLocal->toDateString();
+
+            $autoClockedOut = false;
+            $autoClockOutTimeUtc = null;
+            $reason = null;
+            $isUnusual = false;
+
+            // --- RULE B: Over-hours / Restrict tracking beyond assigned shift hours ---
+            $jobShift = $log->assignment_id ? $employee->getJobShiftConfig((int) $log->assignment_id) : null;
+            $allowBeyond = $jobShift && !empty($jobShift['allow_beyond_shift']);
+            $restrictBeyondShift = (!$allowBeyond && $jobShift) || (isset($employee->permissions['restrict_beyond_shift']) && $employee->permissions['restrict_beyond_shift']);
+
+            $assignedShiftEndTimeUtc = null;
+            $schedule = Schedule::where('employee_id', $employee->id)
+                ->published()
+                ->whereDate('shift_date', $clockInDate)
+                ->when($log->assignment_id, function ($q) use ($log) {
+                    $q->where(function ($sub) use ($log) {
+                        $sub->where('assignment_id', $log->assignment_id)->orWhereNull('assignment_id');
+                    });
+                })
+                ->when($log->task_id, function ($q) use ($log) {
+                    $q->where(function ($sub) use ($log) {
+                        $sub->where('task_id', $log->task_id)->orWhereNull('task_id');
+                    });
+                })
+                ->first();
+
+            if ($schedule) {
+                $schedStartLocal = Carbon::parse($schedule->shift_date->format('Y-m-d') . ' ' . self::extractTimeOnly($schedule->start_time), $empTz);
+                $schedEndLocal = Carbon::parse($schedule->shift_date->format('Y-m-d') . ' ' . self::extractTimeOnly($schedule->end_time), $empTz);
+                if ($schedEndLocal->lte($schedStartLocal)) {
+                    $schedEndLocal->addDay();
+                }
+                $assignedShiftEndTimeUtc = $schedEndLocal->copy()->setTimezone('UTC');
+            } elseif ($jobShift && isset($jobShift['shift_hours']) && (float) $jobShift['shift_hours'] > 0) {
+                $shiftMinutes = (int) round(((float) $jobShift['shift_hours']) * 60);
+                $assignedShiftEndTimeUtc = $clockInUtc->copy()->addMinutes($shiftMinutes);
+            } elseif ($restrictBeyondShift && $employee->standard_shift_hours && (float) $employee->standard_shift_hours > 0) {
+                $shiftMinutes = (int) round(((float) $employee->standard_shift_hours) * 60);
+                $assignedShiftEndTimeUtc = $clockInUtc->copy()->addMinutes($shiftMinutes);
+            }
+
+            if ($restrictBeyondShift && $assignedShiftEndTimeUtc && $nowUtc->gte($assignedShiftEndTimeUtc)) {
+                $autoClockedOut = true;
+                $autoClockOutTimeUtc = $assignedShiftEndTimeUtc;
+                $isUnusual = false;
+                $reason = "Auto clocked out by the end of assigned shift time (tracking beyond assigned hours is not permitted).";
+            }
+
+            // --- RULE A: Clocked in prior to new day shift commencement ---
+            $subsequentShift = Schedule::where('employee_id', $employee->id)
+                ->published()
+                ->where(function ($q) use ($clockInDate, $clockInLocal) {
+                    $q->whereDate('shift_date', '>', $clockInDate)
+                      ->orWhere(function ($q2) use ($clockInDate, $clockInLocal) {
+                          $q2->whereDate('shift_date', '=', $clockInDate)
+                             ->whereTime('start_time', '>', $clockInLocal->format('H:i:s'));
+                      });
+                })
+                ->orderBy('shift_date')
+                ->orderBy('start_time')
+                ->first();
+
+            if ($subsequentShift) {
+                $nextShiftStartLocal = Carbon::parse($subsequentShift->shift_date->format('Y-m-d') . ' ' . self::extractTimeOnly($subsequentShift->start_time), $empTz);
+                $nextShiftStartUtc = $nextShiftStartLocal->copy()->setTimezone('UTC');
+
+                if ($nowUtc->gte($nextShiftStartUtc->copy()->subMinute())) {
+                    $autoClockedOut = true;
+                    $autoClockOutTimeUtc = $nextShiftStartUtc->copy()->subMinute();
+                    if ($autoClockOutTimeUtc->lt($clockInUtc)) {
+                        $autoClockOutTimeUtc = $nextShiftStartUtc;
+                    }
+                    $isUnusual = true;
+                    $reason = "Auto clocked out before commencement of the new day shift.";
+                }
+            } elseif ($todayDate > $clockInDate) {
+                $stdStart = $employee->standard_shift_start ?: '08:00';
+                $newDayShiftStartLocal = Carbon::parse($todayDate . ' ' . self::extractTimeOnly($stdStart), $empTz);
+                $newDayShiftStartUtc = $newDayShiftStartLocal->copy()->setTimezone('UTC');
+
+                if ($nowUtc->gte($newDayShiftStartUtc) || $nowLocal->diffInHours($clockInLocal) >= 12) {
+                    $autoClockedOut = true;
+                    $autoClockOutTimeUtc = $newDayShiftStartUtc->copy()->subMinute();
+                    if ($autoClockOutTimeUtc->lt($clockInUtc)) {
+                        $autoClockOutTimeUtc = $clockInUtc->copy()->addHours(8);
+                    }
+                    if ($autoClockOutTimeUtc->gt($nowUtc)) {
+                        $autoClockOutTimeUtc = $nowUtc;
+                    }
+                    $isUnusual = true;
+                    $reason = "Auto clocked out before commencement of the new day shift.";
+                }
+            }
+
+            if ($autoClockedOut && $autoClockOutTimeUtc) {
+                if ($log->isOnBreak()) {
+                    $breakStart = $log->getBreakStartedAtCarbon();
+                    $diffSecs = $breakStart ? max(0, $autoClockOutTimeUtc->getTimestamp() - $breakStart->getTimestamp()) : 0;
+                    $breaks = $log->breaks ?? [];
+                    $breaks[] = [
+                        'start' => $breakStart ? $breakStart->toIso8601String() : $autoClockOutTimeUtc->toIso8601String(),
+                        'end' => $autoClockOutTimeUtc->toIso8601String(),
+                        'seconds' => $diffSecs,
+                        'minutes' => (int) round($diffSecs / 60),
+                    ];
+                    $log->breaks = $breaks;
+                    $log->break_minutes = (int) round($log->completedBreakSeconds() / 60);
+                    $log->break_started_at = null;
+                }
+
+                $log->clock_out = $autoClockOutTimeUtc;
+                $log->duration_minutes = (int) ceil($log->netSeconds() / 60);
+                $log->status = 'completed';
+                $log->notes = $log->notes ? ($log->notes . ' | auto clocked out') : 'auto clocked out';
+
+                if ($isUnusual) {
+                    $log->is_unusual = true;
+                    $log->unusual_reason = $log->unusual_reason ? ($log->unusual_reason . ' | ' . $reason) : $reason;
+                }
+
+                $log->save();
+
+                try {
+                    \App\Models\TimeLogNote::create([
+                        'time_log_id' => $log->id,
+                        'user_id' => $employee->id,
+                        'body' => 'auto clocked out',
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning("Failed to create auto clocked out note: " . $e->getMessage());
+                }
+
+                self::processTimeLogSubmission($log);
+                $processed[] = $log->id;
+            }
+        }
+
+        return [
+            'auto_clocked_out_count' => count($processed),
+            'log_ids' => $processed,
+        ];
+    }
+
+    /**
+     * Safely extract the time component (HH:MM:SS or HH:MM) from a string that might be a full datetime or time.
+     */
+    private static function extractTimeOnly(?string $time): string
+    {
+        if (empty($time)) {
+            return '00:00:00';
+        }
+        $trimmed = trim($time);
+        if (str_contains($trimmed, ' ')) {
+            $parts = explode(' ', $trimmed);
+            return end($parts);
+        }
+        return $trimmed;
     }
 }

@@ -28,12 +28,17 @@ class MapLocations extends Component
             'name'            => 'required|string|max:100',
             'site_alias'      => 'nullable|string|max:50',
             'tracking_policy' => 'required|in:required,disabled,optional',
-            'latitude'        => 'nullable|numeric|between:-90,90',
-            'longitude'       => 'nullable|numeric|between:-180,180',
-            'geofence_radius' => 'nullable|integer|min:10|max:10000',
+            'latitude'        => 'required|numeric|between:-90,90',
+            'longitude'       => 'required|numeric|between:-180,180',
+            'geofence_radius' => 'required|integer|min:10|max:10000',
             'address'         => 'nullable|string|max:500',
         ];
     }
+
+    protected $messages = [
+        'latitude.required'  => 'GPS coordinates are mandatory for location presets. Click the map to place a pin.',
+        'longitude.required' => 'GPS coordinates are mandatory for location presets. Click the map to place a pin.',
+    ];
 
     public function resetForm()
     {

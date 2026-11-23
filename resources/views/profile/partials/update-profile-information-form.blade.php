@@ -26,8 +26,8 @@
                     reader.readAsDataURL($refs.photo.files[0]);
                 }
              }"
-             class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 flex flex-wrap items-center gap-4">
-            <div class="relative w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-800 border-2 border-cs-blue shadow-inner flex items-center justify-center shrink-0">
+             class="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-wrap items-center gap-4">
+            <div class="relative w-16 h-16 rounded-full overflow-hidden bg-gray-200 border-2 border-cs-blue shadow-inner flex items-center justify-center shrink-0">
                 <template x-if="photoPreview">
                     <img :src="photoPreview" alt="New DP Preview" class="w-full h-full object-cover">
                 </template>
@@ -51,7 +51,7 @@
                 <x-input-label for="avatar" :value="__('Display Picture (DP)')" class="font-bold uppercase tracking-wider text-xs" />
                 <div class="mt-1 flex items-center gap-2">
                     <input type="file" id="avatar" name="avatar" x-ref="photo" @change="updatePreview()" accept="image/*"
-                           class="text-xs text-gray-600 dark:text-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-cs-blue file:text-white hover:file:bg-blue-800 cursor-pointer">
+                           class="text-xs text-gray-600 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-cs-blue file:text-white hover:file:bg-blue-800 cursor-pointer">
                     @if($user->avatar)
                         <label class="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 cursor-pointer font-semibold ml-2">
                             <input type="checkbox" name="remove_avatar" value="1" class="rounded text-red-600 focus:ring-0 text-xs">
@@ -59,7 +59,7 @@
                         </label>
                     @endif
                 </div>
-                <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Upload JPEG, PNG or WebP image up to 5MB.</p>
+                <p class="text-[10px] text-gray-500 mt-1">Upload JPEG, PNG or WebP image up to 5MB.</p>
                 <x-input-error class="mt-1" :messages="$errors->get('avatar')" />
             </div>
         </div>
@@ -86,7 +86,7 @@
             <x-input-label for="email" :value="__('Email Address')" />
             @if($user->isEmployee())
                 <div class="relative mt-1">
-                    <x-text-input id="email" name="email" type="email" class="block w-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed border-gray-300" :value="$user->email" readonly />
+                    <x-text-input id="email" name="email" type="email" class="block w-full bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300" :value="$user->email" readonly />
                     <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔒 Locked</span>
                 </div>
                 <p class="text-[11px] text-gray-500 mt-1">
@@ -99,16 +99,16 @@
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>
-                    <p class="text-sm mt-2 text-gray-800 dark:text-gray-200">
+                    <p class="text-sm mt-2 text-gray-800">
                         {{ __('Your email address is unverified.') }}
 
-                        <button form="send-verification" class="underline text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800">
+                        <button form="send-verification" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                             {{ __('Click here to re-send the verification email.') }}
                         </button>
                     </p>
 
                     @if (session('status') === 'verification-link-sent')
-                        <p class="mt-2 font-medium text-sm text-green-600 dark:text-green-400">
+                        <p class="mt-2 font-medium text-sm text-green-600">
                             {{ __('A new verification link has been sent to your email address.') }}
                         </p>
                     @endif
@@ -125,7 +125,7 @@
                     x-show="show"
                     x-transition
                     x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600 dark:text-gray-400"
+                    class="text-sm text-gray-600"
                 >{{ __('Saved.') }}</p>
             @endif
         </div>

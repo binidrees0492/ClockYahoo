@@ -749,10 +749,13 @@
                         <input type="hidden" wire:model="shiftLongitude">
                         <input type="hidden" wire:model="shiftGeofenceRadius">
 
-                        @if($shiftLocationPresetId && $shiftLatitude && $shiftLongitude)
+                        @if($shiftLatitude && $shiftLongitude)
                             <div class="bg-white border border-sky-200 rounded p-2 text-xs flex justify-between items-center text-gray-700 shadow-2xs">
-                                <span class="font-bold truncate max-w-[200px]" title="{{ $shiftLocationName }}">🏢 {{ $shiftLocationName }}</span>
-                                <span class="text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.2 rounded border border-blue-100">Radius: {{ $shiftGeofenceRadius ?: 200 }}m</span>
+                                <div class="truncate max-w-[200px]">
+                                    <span class="font-bold truncate" title="{{ $shiftLocationName ?: 'Assigned Coordinates' }}">🏢 {{ $shiftLocationName ?: 'Coordinates Attached' }}</span>
+                                    <div class="text-[10px] font-mono text-gray-500">📍 {{ number_format((float)$shiftLatitude, 4) }}, {{ number_format((float)$shiftLongitude, 4) }}</div>
+                                </div>
+                                <span class="text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.5 rounded border border-blue-100">Radius: {{ $shiftGeofenceRadius ?: 200 }}m</span>
                             </div>
                         @endif
 
@@ -1058,6 +1061,16 @@
                         if (this.map) this.map.invalidateSize();
                     }, 400);
                 });
+
+                this.$wire.$watch('shiftLatitude', () => {
+                    this.handleCoordinatesUpdated({});
+                });
+                this.$wire.$watch('shiftLongitude', () => {
+                    this.handleCoordinatesUpdated({});
+                });
+                this.$wire.$watch('shiftGeofenceRadius', () => {
+                    this.handleCoordinatesUpdated({});
+                });
             },
 
             getPinIcon() {
@@ -1171,15 +1184,16 @@
             },
 
             handleCoordinatesUpdated(detail) {
-                if (!detail) {
-                    this.clearMapVisuals();
-                    return;
-                }
-                const lat = parseFloat(detail.lat);
-                const lng = parseFloat(detail.lng);
-                const radius = parseInt(detail.radius) || 200;
+                const data = (Array.isArray(detail) && detail[0]) ? detail[0] : (detail || {});
+                const rawLat = data.lat !== undefined ? data.lat : (data.latitude !== undefined ? data.latitude : this.$wire.shiftLatitude);
+                const rawLng = data.lng !== undefined ? data.lng : (data.longitude !== undefined ? data.longitude : this.$wire.shiftLongitude);
+                const rawRadius = data.radius !== undefined ? data.radius : (data.geofence_radius !== undefined ? data.geofence_radius : this.$wire.shiftGeofenceRadius);
 
-                if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+                const lat = parseFloat(rawLat);
+                const lng = parseFloat(rawLng);
+                const radius = parseInt(rawRadius) || 200;
+
+                if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
                     if (!this.map) {
                         this.initMap();
                     }

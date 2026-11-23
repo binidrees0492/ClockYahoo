@@ -55,13 +55,13 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             {{-- HORIZONTAL TABS BAR --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xs border border-gray-200 dark:border-gray-700 p-2">
+            <div class="bg-white rounded-xl shadow-xs border border-gray-200 p-2">
                 <nav class="flex space-x-2 overflow-x-auto" aria-label="Tabs">
                     {{-- Tab 1: Profile Info --}}
                     <button type="button" @click.prevent="switchTab('profile')"
                             :class="activeTab === 'profile'
                                 ? 'bg-[#005a9c] text-white shadow-xs font-bold'
-                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold'"
+                                : 'text-gray-600 hover:bg-gray-100 font-semibold'"
                             class="px-4 py-2.5 rounded-lg text-xs transition duration-150 flex items-center gap-2 whitespace-nowrap">
                         <i class="fa-solid fa-user"></i>
                         <span>Profile Information</span>
@@ -71,7 +71,7 @@
                     <button type="button" @click.prevent="switchTab('theme')"
                             :class="activeTab === 'theme'
                                 ? 'bg-[#005a9c] text-white shadow-xs font-bold'
-                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold'"
+                                : 'text-gray-600 hover:bg-gray-100 font-semibold'"
                             class="px-4 py-2.5 rounded-lg text-xs transition duration-150 flex items-center gap-2 whitespace-nowrap">
                         <i class="fa-solid fa-palette"></i>
                         <span>Appearance & Theme</span>
@@ -81,7 +81,7 @@
                     <button type="button" @click.prevent="switchTab('security')"
                             :class="activeTab === 'security'
                                 ? 'bg-[#005a9c] text-white shadow-xs font-bold'
-                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold'"
+                                : 'text-gray-600 hover:bg-gray-100 font-semibold'"
                             class="px-4 py-2.5 rounded-lg text-xs transition duration-150 flex items-center gap-2 whitespace-nowrap">
                         <i class="fa-solid fa-shield-halved"></i>
                         <span>Security & Passkeys</span>
@@ -91,7 +91,7 @@
                     <button type="button" @click.prevent="switchTab('notifications')"
                             :class="activeTab === 'notifications'
                                 ? 'bg-[#005a9c] text-white shadow-xs font-bold'
-                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold'"
+                                : 'text-gray-600 hover:bg-gray-100 font-semibold'"
                             class="px-4 py-2.5 rounded-lg text-xs transition duration-150 flex items-center gap-2 whitespace-nowrap">
                         <i class="fa-solid fa-bell"></i>
                         <span>Notification Preferences</span>
@@ -100,7 +100,7 @@
             </div>
 
             {{-- TAB 1: PROFILE INFORMATION --}}
-            <div x-show="activeTab === 'profile'" x-cloak class="p-6 bg-white dark:bg-gray-800 shadow-xs sm:rounded-xl border border-gray-200 dark:border-gray-700">
+            <div x-show="activeTab === 'profile'" x-cloak class="p-6 bg-white shadow-xs sm:rounded-xl border border-gray-200">
                 <div class="max-w-2xl">
                     <div @submit="clearDirty()">
                         @include('profile.partials.update-profile-information-form')
@@ -109,7 +109,7 @@
             </div>
 
             {{-- TAB 2: APPEARANCE & THEME --}}
-            <div x-show="activeTab === 'theme'" x-cloak class="p-6 bg-white dark:bg-gray-800 shadow-xs sm:rounded-xl border border-gray-200 dark:border-gray-700">
+            <div x-show="activeTab === 'theme'" x-cloak class="p-6 bg-white shadow-xs sm:rounded-xl border border-gray-200">
                 <div class="max-w-3xl">
                     @livewire('profile.personal-configs', ['activeTab' => 'theme'])
                 </div>
@@ -118,14 +118,14 @@
             {{-- TAB 3: SECURITY & PASSKEYS --}}
             <div x-show="activeTab === 'security'" x-cloak class="space-y-6">
                 {{-- WebAuthn Passkeys First Setup & Management --}}
-                <div class="p-6 bg-white dark:bg-gray-800 shadow-xs sm:rounded-xl border border-gray-200 dark:border-gray-700">
+                <div class="p-6 bg-white shadow-xs sm:rounded-xl border border-gray-200">
                     <div class="max-w-4xl">
                         @livewire('profile.personal-configs', ['activeTab' => 'security'])
                     </div>
                 </div>
 
                 {{-- Update Password Form --}}
-                <div class="p-6 bg-white dark:bg-gray-800 shadow-xs sm:rounded-xl border border-gray-200 dark:border-gray-700">
+                <div class="p-6 bg-white shadow-xs sm:rounded-xl border border-gray-200">
                     <div class="max-w-xl">
                         <div @submit="clearDirty()">
                             @include('profile.partials.update-password-form')
@@ -135,7 +135,7 @@
             </div>
 
             {{-- TAB 4: NOTIFICATION PREFERENCES --}}
-            <div x-show="activeTab === 'notifications'" x-cloak class="p-6 bg-white dark:bg-gray-800 shadow-xs sm:rounded-xl border border-gray-200 dark:border-gray-700">
+            <div x-show="activeTab === 'notifications'" x-cloak class="p-6 bg-white shadow-xs sm:rounded-xl border border-gray-200">
                 <div class="max-w-5xl">
                     @livewire('notification-settings', ['activeTab' => 'personal'])
                 </div>
@@ -145,21 +145,21 @@
         {{-- UNSAVED CHANGES CONFIRMATION MODAL --}}
         <div x-show="showUnsavedModal" x-cloak
              class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-gray-200 dark:border-gray-700"
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-gray-200"
                  @click.away="cancelSwitch()">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-lg font-bold shrink-0">
                         <i class="fa-solid fa-triangle-exclamation"></i>
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-gray-900 dark:text-gray-100">Unsaved Changes</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        <h3 class="text-base font-bold text-gray-900">Unsaved Changes</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
                             You have modified inputs in this section that are not yet saved.
                         </p>
                     </div>
                 </div>
 
-                <div class="text-xs text-gray-700 dark:text-gray-300 bg-amber-50/70 border border-amber-200 p-3 rounded-xl leading-relaxed">
+                <div class="text-xs text-gray-700 bg-amber-50/70 border border-amber-200 p-3 rounded-xl leading-relaxed">
                     If you leave this tab without clicking <strong>Save</strong>, your changes will be discarded.
                 </div>
 

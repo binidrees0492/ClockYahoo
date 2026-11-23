@@ -133,7 +133,7 @@
                                             <span class="w-4 h-4 rounded-full bg-[#005a9c] text-white text-[10px] flex items-center justify-center font-bold">✓</span>
                                         @endif
                                     </div>
-                                    <p class="text-[10px] text-gray-600 dark:text-gray-400 mt-1 leading-snug">
+                                    <p class="text-[10px] text-gray-600 mt-1 leading-snug">
                                         Updates your user profile in <strong>Personal Configs</strong>. Persists permanently across all devices and future logins.
                                     </p>
                                 </label>
@@ -143,7 +143,7 @@
                         {{-- TIMEZONE SEARCH & SELECTOR --}}
                         <div>
                             <div class="flex items-center justify-between mb-1">
-                                <label class="font-bold text-gray-800 dark:text-gray-200">
+                                <label class="font-bold text-gray-800">
                                     Choose Target Timezone:
                                 </label>
                                 <span class="text-[11px] text-gray-500 font-mono">Selected: <strong>{{ $selectedTimezone }}</strong></span>
@@ -154,19 +154,19 @@
                                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
                                 <input type="text" wire:model.live.debounce.200ms="searchTimezone"
                                        placeholder="Filter by city, region or abbreviation (e.g. New York, London, Tokyo, PKT, EST)..."
-                                       class="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs bg-white dark:bg-gray-900 focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
+                                       class="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-800 focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                             </div>
 
                             {{-- Categorized Timezones List --}}
-                            <div class="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-xl divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-900">
+                            <div class="max-h-48 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white">
                                 @forelse($timezones as $region => $regionTzs)
                                     @if(count($regionTzs) > 0)
-                                        <div class="px-2.5 py-1 bg-gray-50 dark:bg-gray-800/60 text-[10px] font-bold text-gray-500 uppercase tracking-wider sticky top-0">
+                                        <div class="px-2.5 py-1 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider sticky top-0">
                                             {{ $region }}
                                         </div>
                                         @foreach($regionTzs as $tzKey => $tzLabel)
                                             <button type="button" wire:click="selectTimezone('{{ $tzKey }}')"
-                                                    class="w-full px-3 py-2 text-left flex items-center justify-between text-xs transition {{ $selectedTimezone === $tzKey ? 'bg-sky-50 dark:bg-sky-950/40 text-[#005a9c] dark:text-sky-300 font-bold' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800' }}">
+                                                    class="w-full px-3 py-2 text-left flex items-center justify-between text-xs transition {{ $selectedTimezone === $tzKey ? 'bg-sky-50 text-[#005a9c] font-bold' : 'text-gray-700 hover:bg-gray-50' }}">
                                                 <div class="flex items-center gap-2">
                                                     <span class="w-3.5 text-center text-xs">
                                                         {{ $selectedTimezone === $tzKey ? '✓' : '•' }}
@@ -190,7 +190,7 @@
                     </div>
 
                     {{-- Modal Footer --}}
-                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                    <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
                         <div>
                             @if($isTemp)
                                 <button type="button" wire:click="revertToProfile"

@@ -16,6 +16,12 @@ class Locations extends Component
 
     public $locationId;
     public $name;
+    public $site_alias;
+    public $latitude = null;
+    public $longitude = null;
+    public $geofence_radius = 200;
+    public $tracking_policy = 'flag';
+    public $address = '';
     public $status = 'Active';
 
     public function mount()
@@ -36,7 +42,11 @@ class Locations extends Component
     public function create()
     {
         $this->resetValidation();
-        $this->reset(['locationId', 'name']);
+        $this->reset(['locationId', 'name', 'site_alias', 'address']);
+        $this->latitude = 37.7749;
+        $this->longitude = -122.4194;
+        $this->geofence_radius = 200;
+        $this->tracking_policy = 'flag';
         $this->status = 'Active';
         $this->showForm = true;
     }
@@ -48,6 +58,12 @@ class Locations extends Component
 
         $this->locationId = $location->id;
         $this->name = $location->name;
+        $this->site_alias = $location->site_alias;
+        $this->latitude = $location->latitude ?? 37.7749;
+        $this->longitude = $location->longitude ?? -122.4194;
+        $this->geofence_radius = $location->geofence_radius ?: 200;
+        $this->tracking_policy = $location->tracking_policy ?: 'flag';
+        $this->address = $location->address;
         $this->status = $location->status ?? 'Active';
 
         $this->showForm = true;
@@ -61,19 +77,40 @@ class Locations extends Component
     public function save()
     {
         $this->validate([
-            'name' => 'required|string|max:255|unique:tbl_locations,name,' . $this->locationId,
-            'status' => 'required|string|in:Active,Inactive',
+            'name'            => 'required|string|max:255|unique:tbl_locations,name,' . $this->locationId,
+            'site_alias'      => 'nullable|string|max:50',
+            'latitude'        => 'required|numeric|between:-90,90',
+            'longitude'       => 'required|numeric|between:-180,180',
+            'geofence_radius' => 'required|integer|min:10|max:10000',
+            'tracking_policy' => 'required|string|in:mandatory,required,flag,optional,disabled',
+            'address'         => 'nullable|string|max:500',
+            'status'          => 'required|string|in:Active,Inactive',
+        ], [
+            'latitude.required'  => 'GPS coordinates are mandatory for location presets. Click the map to set a location.',
+            'longitude.required' => 'GPS coordinates are mandatory for location presets. Click the map to set a location.',
         ]);
+
+        $normalizedPolicy = match($this->tracking_policy) {
+            'mandatory' => 'required',
+            'flag'      => 'optional',
+            default     => $this->tracking_policy,
+        };
 
         Location::updateOrCreate(
             ['id' => $this->locationId],
             [
-                'name' => $this->name,
-                'status' => $this->status,
+                'name'            => $this->name,
+                'site_alias'      => $this->site_alias,
+                'latitude'        => (float) $this->latitude,
+                'longitude'       => (float) $this->longitude,
+                'geofence_radius' => (int) $this->geofence_radius,
+                'tracking_policy' => $normalizedPolicy,
+                'address'         => $this->address,
+                'status'          => $this->status,
             ]
         );
 
-        $msg = $this->locationId ? 'Location updated successfully.' : 'Location created successfully.';
+        $msg = $this->locationId ? 'Location updated successfully.' : 'Location preset created successfully with mandatory GPS coordinates.';
         session()->flash('message', $msg);
         $this->dispatch('toast', message: $msg, type: 'success');
         $this->showForm = false;
